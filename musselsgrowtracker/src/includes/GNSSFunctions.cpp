@@ -133,7 +133,7 @@ void GNSSHandler::readGpsTime() {
     uint8_t seconds = currentLocation.seconds();
     uint16_t milliseconds = currentLocation.millis();
 
-    unsigned long timestamp = (year, month, day, hours, minutes, seconds);
+    unsigned long timestamp = convertDateToUnixTime(year, month, day, hours, minutes, seconds);
 
     char gpsTimeStr[50];
     snprintf(gpsTimeStr, sizeof(gpsTimeStr), "GPS Time: %04u-%02u-%02u %02u:%02u:%02u.%03u",
@@ -143,7 +143,7 @@ void GNSSHandler::readGpsTime() {
     log(String(timestamp), 1);
 
   } else {
-    log("Satellite fix still in progress...",1);
+    log("Satellite fix still in progress...", 1);
   }
 }
 

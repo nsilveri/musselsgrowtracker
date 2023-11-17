@@ -18,5 +18,6 @@ struct DebugState {
 void setDebugMode(bool value);
 void setDebugLevel(uint8_t value);
 void log(String log, uint8_t LOG_LEVEL);
+void deep_sleep(uint32_t seconds);
 
 #endif // UTILITIES_H

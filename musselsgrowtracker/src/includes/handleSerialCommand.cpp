@@ -3,6 +3,7 @@
 #include "handleSerialCommand.h"
 #include "GNSSFunctions.h"
 #include "SPIFlash.h"
+#include <STM32L0.h>
 
 bool DEBUG = true;
 uint8_t LOG_LEV =1;
@@ -45,11 +46,6 @@ void handleSerialCommand(char command) {
     case 'o':
       gnssHandler.readGpsTime();
       break;
-
-    case 'h':
-    case '\0':
-      log("HELP :\n \t\t\t-s) Trigger GNSS reading manually\n \t\t\t-g) Read Device GPS data\n \t\t\t-d) Enable/disable debug\n \t\t\t-1) Set log level 1\n \t\t\t-2) Set log level 2", 1);
-      break;
     
     case 'f':
       log("reading intMemory info...", 1);
@@ -58,5 +54,17 @@ void handleSerialCommand(char command) {
       intMemory.getChipID();
       intMemory.powerDown();
       break;
+
+    case 'p':
+      deep_sleep(10);
+      break;
+
+    case 'h':
+    case '\0':
+      log("HELP :\n \t\t\t-s) Trigger GNSS reading manually\n \t\t\t-g) Read Device GPS data\n \t\t\t-d) Enable/disable debug\n \t\t\t-p) deep-sleep test\n \t\t\t-1) Set log level 1\n \t\t\t-2) Set log level 2", 1);
+      break;
+
+    default:
+      log("invalid command!", 1);
   }
 }
