@@ -1,8 +1,8 @@
 #include <STM32L0.h>
 #include <Arduino.h>
-#include "utilities.h"
-#include "GNSSFunctions.h"
-#include "handleSerialCommand.h"
+#include "src\includes\utilities.h"
+#include "src\includes\GNSSFunctions.h"
+#include "src\includes\handleSerialCommand.h"
 
 #define SLEEP 0
 #define RTC_INT 1

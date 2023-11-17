@@ -2,6 +2,7 @@
 #ifndef HANDLE_SERIAL_COMMAND_H
 #define HANDLE_SERIAL_COMMAND_H
 
+#include <Arduino.h>
 #include "utilities.h"
 
 extern bool DEBUG;
