@@ -3,8 +3,10 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <math.h>
-#include "utilities.h"
+#include "..\utilities\utilities.h"
 #include "convertDateToUnixTime.h"
+//#include "intRTC.h"
+#include <RTC.h>
 
 
 // CAM M8Q GNSS configuration
@@ -12,11 +14,27 @@
 #define pps          4     // 1 Hz fix pulse
 #define GNSS_backup A0     // RTC backup for MAX M8Q
 
+const uint8_t tolerance = 5;
+const uint8_t RTC_GPStolerance = 5;
+
+unsigned long GNStimestamp = 0;
+unsigned long RTCtimestamp = 0;
+
 LocationData invalidLocVal = {0.0000000, 0.0000000, 0.000, 0.000};
 LocationData prevLocVal = invalidLocVal;
 LocationData currLocVal = invalidLocVal;
 
-void GNSSHandler::read_positioning_data() {
+bool GNSSHandler::displacementAlert(uint8_t movement, uint8_t tolerance)
+{
+  if(movement >= tolerance)
+  {
+    log("Displacement alarm!!!", 1);
+    return true;
+  }return false;
+}
+
+
+bool GNSSHandler::readPositioningData() {
   GNSSLocation currentLocation = gnssHandler.getLocation();
 
   currLocVal.lat = currentLocation.latitude();
@@ -34,25 +52,37 @@ void GNSSHandler::read_positioning_data() {
     distance = gnssHandler.calculateDistance(currLocVal, prevLocVal);
   }
 
-  currLocVal.shift = distance;
+  currLocVal.displacement = distance;
 
-snprintf(currLocStr, sizeof(currLocStr), "CURRENT LOCATION: %.7f,%.7f,%.3f SATELLITES=%d SHIFT: %.2f meters",
-           currLocVal.lat, currLocVal.lon, currLocVal.alt, currLocVal.satNum, currLocVal.shift);
-snprintf(prevLocStr, sizeof(prevLocStr), "PREVIOUS LOCATION: %.7f,%.7f,%.3f SATELLITES=%d SHIFT: %.2f meters",
-           prevLocVal.lat, prevLocVal.lon, prevLocVal.alt, prevLocVal.satNum, prevLocVal.shift);
-snprintf(distLoc, sizeof(distLoc), "SHIFT: %.2f meters", distance);
+  if(DEBUG_MODE && gnssHandler.getLocation())
+  {
+    snprintf(currLocStr, sizeof(currLocStr), "CURRENT LOCATION: %.7f,%.7f,%.3f SATELLITES=%d DISPLACEMENT: %.2f meters",
+              currLocVal.lat, currLocVal.lon, currLocVal.alt, currLocVal.satNum, currLocVal.displacement);
+    snprintf(prevLocStr, sizeof(prevLocStr), "PREVIOUS LOCATION: %.7f,%.7f,%.3f SATELLITES=%d DISPLACEMENT: %.2f meters",
+              prevLocVal.lat, prevLocVal.lon, prevLocVal.alt, prevLocVal.satNum, prevLocVal.displacement);
+    snprintf(distLoc, sizeof(distLoc), "DISPLACEMENT: %.2f meters", distance);
 
-  log(currLocStr, 1); //print current position data
-  log(prevLocStr, 1); //print last position data
-  log(distLoc, 1);    //print dist beetwen positions
-
+    log(currLocStr, 1); //print current position data
+    log(prevLocStr, 1); //print last position data
+    log(distLoc, 1);    //print dist beetwen positions
+    return true;
+  }else if(DEBUG_MODE && gnssHandler.getLocation() == false)
+  {
+    log("GNSS still fixing...",1);
+    return false;
+  }
+  
+  /*
   if (currLocVal != prevLocVal) {
     log("OLD GNSS VAL != NEW GNSS VAL!", 2);
     prevLocVal.lat = currLocVal.lat;
     prevLocVal.lon = currLocVal.lon;
     prevLocVal.alt = currLocVal.alt;
     prevLocVal.satNum = currLocVal.satNum;
+    prevLocVal.displacement = currLocVal.displacement;
   }
+  return true;
+  */
 }
 
 GNSSHandler::GNSSHandler() {
@@ -122,6 +152,8 @@ double GNSSHandler::calculateDistance(const LocationData& loc1, const LocationDa
 }
 
 void GNSSHandler::readGpsTime() {
+
+  RTCtimestamp = RTC.getEpoch();
   GNSSLocation currentLocation = gnssHandler.getLocation();
 
   if (currentLocation) {
@@ -133,17 +165,35 @@ void GNSSHandler::readGpsTime() {
     uint8_t seconds = currentLocation.seconds();
     uint16_t milliseconds = currentLocation.millis();
 
-    unsigned long timestamp = convertDateToUnixTime(year, month, day, hours, minutes, seconds);
+    GNStimestamp = convertDateToUnixTime(year, month, day, hours, minutes, seconds);
 
     char gpsTimeStr[50];
     snprintf(gpsTimeStr, sizeof(gpsTimeStr), "GPS Time: %04u-%02u-%02u %02u:%02u:%02u.%03u",
             year, month, day, hours, minutes, seconds, milliseconds);
-
+    
     log(gpsTimeStr, 1);
-    log(String(timestamp), 1);
+    log(String(GNStimestamp), 1);
 
   } else {
     log("Satellite fix still in progress...", 1);
+    log(String(RTCtimestamp), 1);
+  }
+}
+
+void GNSSHandler::updateRTCViaGNSS()
+{
+  RTCtimestamp = RTC.getEpoch();
+  log("RTCts= " + String(RTCtimestamp), 1);
+  log("GNSts= " + String(GNStimestamp), 1);
+  log("Difference= " + String(abs(RTCtimestamp - GNStimestamp)) + "s", 1);
+
+  if(abs(RTCtimestamp - GNStimestamp) > RTC_GPStolerance)
+  {
+    log("The RTC time is not synced with the GNSS time", 1);
+    log("Synching...", 1);
+    RTC.setEpoch(GNStimestamp);
+    log("RTC time was synced.", 1);
+
   }
 }
 

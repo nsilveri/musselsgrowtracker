@@ -1,8 +1,11 @@
 #include <STM32L0.h>
 #include <Arduino.h>
-#include "src\includes\utilities.h"
-#include "src\includes\GNSSFunctions.h"
-#include "src\includes\handleSerialCommand.h"
+#include "src\includes\utilities\utilities.h"
+#include "src\includes\GNSSFunctions\GNSSFunctions.h"
+#include "src\includes\handleSerial\handleSerialCommand.h"
+#include "src\includes\loadCell\loadCell.h"
+//#include "src\includes\intRTC.h"
+#include <RTC.h>
 
 #define SLEEP 0
 #define RTC_INT 1
@@ -11,8 +14,9 @@
 #define LORAW_SENDING 4
 #define TIMEOUT_EXE 99
 
-bool SerialDebug = true;
+#define MOV_TOLERANCE 5
 
+bool SerialDebug = true;
 
 unsigned long previousMillis = 0; 
 const long interval = 1000;
@@ -29,15 +33,18 @@ void setup() {
   setDebugMode(DEBUG);
   setDebugLevel(LOG_LEV);
 
+  loadCell.begin();
+  intBlueLED.begin();
+
   gnssHandler.begin();  // Initialize GNSS
   gnssHandler.enable();
 
   Step = 0;
 
   // set alarm to update the RTC periodically
-  setNextAlarmIn(SecondsBetweenActivations);
-  RTC.enableAlarm(RTC.MATCH_YYMMDDHHMMSS);
-  RTC.attachInterrupt(alarmMatch);
+  //setNextAlarmIn(SecondsBetweenActivations);
+  //RTC.enableAlarm(RTC.MATCH_YYMMDDHHMMSS);
+  //RTC.attachInterrupt(alarmMatch);
 }
 
 void alarmMatch()
@@ -51,6 +58,25 @@ void alarmMatch()
 	STM32L0.wakeup();
 }
 
+void gnssDataAcquisition()
+{
+  //while(gnssHandler.readPositioningData() == false)
+  //{
+    gnssHandler.readPositioningData();
+  //}
+  if(gnssHandler.displacementAlert(currLocVal.displacement, MOV_TOLERANCE))
+  {
+    //associare bit alarm displacement
+  }
+}
+
+void run()
+{
+  //GNSS data acquisition
+  //sync RTC with GNSS
+  //reading the load cell value
+}
+
 void loop() {
   
   unsigned long currentMillis = millis();
@@ -59,6 +85,7 @@ void loop() {
     log(String(Step),2);
   }
 
+  /*
   switch (Step) {
     case 0:
       STM32L0.stop(10000); //stop per 1 ora
@@ -70,11 +97,12 @@ void loop() {
       gnssHandler.enable();  // Enable GNSS
       break;
   }
+  */
 
   gnssHandler.update();  // Update GNSS data
 
   if (gnssHandler.isTracking()) {
-    gnssHandler.read_positioning_data();
+    gnssHandler.readPositioningData();
   }
 
   if (Serial.available()) {

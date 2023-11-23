@@ -3,7 +3,7 @@
 #define HANDLE_SERIAL_COMMAND_H
 
 #include <Arduino.h>
-#include "utilities.h"
+#include "..\utilities\utilities.h"
 
 extern bool DEBUG;
 extern uint8_t LOG_LEV;

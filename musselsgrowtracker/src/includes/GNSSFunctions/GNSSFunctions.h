@@ -12,7 +12,7 @@ struct LocationData {
   double lon;
   float alt;
   uint8_t satNum;
-  float shift;
+  float displacement;
 
   bool operator!=(const LocationData& other) const {
     return lat != other.lat || lon != other.lon || alt != other.alt || satNum != other.satNum;
@@ -25,6 +25,7 @@ struct LocationData {
 extern LocationData invalidLocVal;
 extern LocationData prevLocVal;
 extern LocationData currLocVal;
+extern const uint8_t tolerance;
 
 class GNSSHandler {
 public:
@@ -36,8 +37,10 @@ public:
   bool isTracking();
   GNSSLocation getLocation();
   double calculateDistance(const LocationData& loc1, const LocationData& loc2);
-  void read_positioning_data();
+  bool readPositioningData();
   void readGpsTime();
+  void updateRTCViaGNSS();
+  bool displacementAlert(uint8_t movement, uint8_t tolerance);
 private:
   volatile bool tracking;
   double toRadians(double degree);
