@@ -11,27 +11,31 @@ void LoadCell::begin()
 {
     pinMode(MOSFET_PIN, OUTPUT);
     digitalWrite(MOSFET_PIN, MOSFET_STATE);
+    loadCellADC.begin();
+}
+
+bool LoadCell::mosfet_state_change(bool STATE)
+{
+    digitalWrite(MOSFET_PIN, STATE);
+    return STATE;
 }
 
 bool LoadCell::turn_on()
 {   
     MOSFET_STATE = true;
-    digitalWrite(MOSFET_PIN, MOSFET_STATE);
-    return MOSFET_STATE;
+    mosfet_state_change(MOSFET_STATE);
 }
 
 bool LoadCell::turn_on_off()
 {   
     MOSFET_STATE = !MOSFET_STATE;
-    digitalWrite(MOSFET_PIN, MOSFET_STATE);
-    return MOSFET_STATE;
+    mosfet_state_change(MOSFET_STATE);
 }
 
 bool LoadCell::turn_off()
 {
     MOSFET_STATE = false;
-    digitalWrite(MOSFET_PIN, MOSFET_STATE);
-    return MOSFET_STATE;
+    mosfet_state_change(MOSFET_STATE);
 }
 
 void LoadCell::setOffset()
@@ -44,17 +48,22 @@ void LoadCell::calibrate(float weightKnown)
     loadCellADC.calibrate(weightKnown);
 }
 
+
 void LoadCell::setScale(float weightKnown)
 {
     loadCellADC.setScale(weightKnown);
 }
 
-void LoadCell::read_weight()
-{   
-    loadCellADC.begin();
+void LoadCell::print_tare()
+{
     loadCellADC.printTare();
-    delay(500);
-    loadCellADC.getWeight();
+}
+
+void LoadCell::read_weight(byte times)
+{   
+    //loadCellADC.begin();
+    //loadCellADC.printTare();
+    loadCellADC.getWeight(times);
     //loadCellADC.readAverage(20);
 }
 

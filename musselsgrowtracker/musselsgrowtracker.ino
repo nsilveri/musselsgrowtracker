@@ -4,6 +4,7 @@
 #include "src\includes\GNSSFunctions\GNSSFunctions.h"
 #include "src\includes\handleSerial\handleSerialCommand.h"
 #include "src\includes\loadCell\loadCell.h"
+#include "src\includes\SPI\SPIFlash.h"
 //#include "src\includes\intRTC.h"
 #include <RTC.h>
 
@@ -33,6 +34,7 @@ void setup() {
   setDebugMode(DEBUG);
   setDebugLevel(LOG_LEV);
 
+  intMemory.init();
   loadCell.begin();
   intBlueLED.begin();
 
@@ -66,6 +68,7 @@ void gnssDataAcquisition()
   //}
   if(gnssHandler.displacementAlert(currLocVal.displacement, MOV_TOLERANCE))
   {
+    log("The buoy has been moved by " + String(currLocVal.displacement) + " meters", 1);
     //associare bit alarm displacement
   }
 }
@@ -82,6 +85,7 @@ void loop() {
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
+    intBlueLED.intLED_on_off();
     log(String(Step),2);
   }
 

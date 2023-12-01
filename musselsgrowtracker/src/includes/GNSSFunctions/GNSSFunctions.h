@@ -5,7 +5,7 @@
 #include <STM32L0.h>
 #include "GNSS.h"
 #include <RTC.h>
-#include "convertDateToUnixTime.h"
+#include "dateConverter.h"
 
 struct LocationData {
   double lat;
@@ -40,10 +40,12 @@ public:
   bool readPositioningData();
   void readGpsTime();
   void updateRTCViaGNSS();
+  void printRTC();
   bool displacementAlert(uint8_t movement, uint8_t tolerance);
 private:
   volatile bool tracking;
   double toRadians(double degree);
+  void savePreviousPosition();
 };
 
 extern GNSSHandler gnssHandler;

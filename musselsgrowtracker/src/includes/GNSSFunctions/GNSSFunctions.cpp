@@ -4,7 +4,7 @@
 #include <Wire.h>
 #include <math.h>
 #include "..\utilities\utilities.h"
-#include "convertDateToUnixTime.h"
+#include "dateConverter.h"
 //#include "intRTC.h"
 #include <RTC.h>
 
@@ -33,9 +33,19 @@ bool GNSSHandler::displacementAlert(uint8_t movement, uint8_t tolerance)
   }return false;
 }
 
+void GNSSHandler::savePreviousPosition()
+{
+  prevLocVal.lat = currLocVal.lat;
+  prevLocVal.lon = currLocVal.lon;
+  prevLocVal.alt = currLocVal.alt;
+  prevLocVal.satNum = currLocVal.satNum;
+}
 
 bool GNSSHandler::readPositioningData() {
   GNSSLocation currentLocation = gnssHandler.getLocation();
+  log("currentLocation: " + String(currentLocation), 2);
+
+  savePreviousPosition();
 
   currLocVal.lat = currentLocation.latitude();
   currLocVal.lon = currentLocation.longitude();
@@ -54,7 +64,7 @@ bool GNSSHandler::readPositioningData() {
 
   currLocVal.displacement = distance;
 
-  if(DEBUG_MODE && gnssHandler.getLocation())
+  if(DEBUG_MODE && currentLocation)
   {
     snprintf(currLocStr, sizeof(currLocStr), "CURRENT LOCATION: %.7f,%.7f,%.3f SATELLITES=%d DISPLACEMENT: %.2f meters",
               currLocVal.lat, currLocVal.lon, currLocVal.alt, currLocVal.satNum, currLocVal.displacement);
@@ -66,23 +76,11 @@ bool GNSSHandler::readPositioningData() {
     log(prevLocStr, 1); //print last position data
     log(distLoc, 1);    //print dist beetwen positions
     return true;
-  }else if(DEBUG_MODE && gnssHandler.getLocation() == false)
+  }else if(!currentLocation)
   {
     log("GNSS still fixing...",1);
     return false;
   }
-  
-  /*
-  if (currLocVal != prevLocVal) {
-    log("OLD GNSS VAL != NEW GNSS VAL!", 2);
-    prevLocVal.lat = currLocVal.lat;
-    prevLocVal.lon = currLocVal.lon;
-    prevLocVal.alt = currLocVal.alt;
-    prevLocVal.satNum = currLocVal.satNum;
-    prevLocVal.displacement = currLocVal.displacement;
-  }
-  return true;
-  */
 }
 
 GNSSHandler::GNSSHandler() {
@@ -151,6 +149,17 @@ double GNSSHandler::calculateDistance(const LocationData& loc1, const LocationDa
   return distance;
 }
 
+void GNSSHandler::printRTC()
+{
+  log("RTC Time: " + String(DateConverter.convertUnixTimeToDate(RTCtimestamp).year) + "-" +
+                  String(DateConverter.convertUnixTimeToDate(RTCtimestamp).month) + "-" +
+                  String(DateConverter.convertUnixTimeToDate(RTCtimestamp).day) + " " +
+                  String(DateConverter.convertUnixTimeToDate(RTCtimestamp).hours) + ":" +
+                  String(DateConverter.convertUnixTimeToDate(RTCtimestamp).minutes) + ":" +
+                  String(DateConverter.convertUnixTimeToDate(RTCtimestamp).seconds) , 1);
+  log(String(RTCtimestamp), 1);
+}
+
 void GNSSHandler::readGpsTime() {
 
   RTCtimestamp = RTC.getEpoch();
@@ -165,18 +174,21 @@ void GNSSHandler::readGpsTime() {
     uint8_t seconds = currentLocation.seconds();
     uint16_t milliseconds = currentLocation.millis();
 
-    GNStimestamp = convertDateToUnixTime(year, month, day, hours, minutes, seconds);
+    GNStimestamp = DateConverter.convertDateToUnixTime(year, month, day, hours, minutes, seconds);
 
     char gpsTimeStr[50];
     snprintf(gpsTimeStr, sizeof(gpsTimeStr), "GPS Time: %04u-%02u-%02u %02u:%02u:%02u.%03u",
             year, month, day, hours, minutes, seconds, milliseconds);
     
     log(gpsTimeStr, 1);
+    printRTC();
+
     log(String(GNStimestamp), 1);
 
   } else {
-    log("Satellite fix still in progress...", 1);
-    log(String(RTCtimestamp), 1);
+    log("GNSS still fixing...", 1);
+    printRTC();
+    
   }
 }
 

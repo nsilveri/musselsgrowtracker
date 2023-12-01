@@ -9,13 +9,15 @@ class LoadCell
 {
     public:
         void begin();
+        bool mosfet_state_change(bool STATE);
         bool turn_on();
         bool turn_on_off();
         bool turn_off();
         void setOffset();
         void setScale(float weightKnown);
         void calibrate(float weightKnown);
-        void read_weight();
+        void read_weight(byte times);
+        void print_tare();
     private:
 
 };

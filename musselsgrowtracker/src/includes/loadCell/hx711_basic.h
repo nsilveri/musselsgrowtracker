@@ -10,7 +10,7 @@ class HX711_module
         void setOffset();
         void setScale(float weightKnown);
         void calibrate(float weightKnown);
-        void getWeight();
+        void getWeight(byte times);
         void readAverage(uint8_t nSamples = 20);
 };
 

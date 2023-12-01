@@ -1,21 +1,25 @@
 #include "HX711.h"
-#include "hx711_basic.h"
+#include "..\loadCell\hx711_basic.h"
 #include "..\utilities\utilities.h"
 
 // HX711 circuit wiring
-const int LOADCELL_DOUT_PIN = 14;
-const int LOADCELL_SCK_PIN = 15;
+const int LOADCELL_DOUT_PIN = A2;
+const int LOADCELL_SCK_PIN  = A3;
 
-float scaleFactor = 43.34; //default value for YZC-516C
+long scaleFactor = 43.34;     //default value for YZC-516C
+float defaultOffset = 49133.0; //default value for YZC-516C
 
 HX711 scale;
 
 void HX711_module::begin() {
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+  scale.set_offset(defaultOffset);
+  scale.set_scale(scaleFactor);
 }
 
 void HX711_module::calibrate(float weightKnown) 
 {
+  scale.power_up();
   log("tare without no weight in 2 seconds", 1);
   delay(2000);
   long b = scale.read_average();
@@ -32,15 +36,12 @@ void HX711_module::calibrate(float weightKnown)
   log("|b: " + String(b) + "\n| x: " + String(x) + "\n| y: " + String(y) + "\n|m: " + String(m), 1);
   scale.set_offset(b);
   scale.set_scale(m);
+  scale.power_down();
 }
 
 void HX711_module::printTare()
 {
-  long   offsetVal = scale.get_offset();
-  float  scaleVal  = scale.get_scale();
-  float  unitsVal  = scale.get_units();
-  double valueVal  = scale.get_value();
-  log("offset: " + String(offsetVal) + " | scale: " + String(scaleVal) + " | units: " + String(unitsVal) + " | value: " + String(valueVal), 1);
+  log("offset: " + String(scale.get_offset()) + " | scale: " + String(scale.get_scale()) + " | units: " + String(scale.get_units()) + " | value: " + String(scale.get_value()), 1);
 }
 
 void HX711_module::setScale(float weightKnown)
@@ -80,14 +81,15 @@ void HX711_module::setOffset()
 }
 
 void HX711_module::read() {
-
+  bool hx711_state = scale.is_ready();
+  log("hx state: " + String(hx711_state), 1);
   if (scale.is_ready()) {
     long reading = scale.read();
     log("HX711 reading: ", 1);
     log(String(reading), 1);
   } else {
     log("HX711 not found.", 1);
-  }  
+  }
 }
 
 void HX711_module::readAverage(uint8_t nSamples) {
@@ -97,13 +99,18 @@ void HX711_module::readAverage(uint8_t nSamples) {
     log("HX711 reading: " + String(reading), 1);
   } else {
     log("HX711 not found.", 1);
-  }  
+  }
 }
 
-void HX711_module::getWeight()
-{
-  float weightVal = scale.get_units(); //.get_value();
-  log("weight: " + String(weightVal) + "g",1);
+void HX711_module::getWeight(byte times)
+{ 
+  if (scale.is_ready()) {
+    log("Reading weight...", 1);
+    float weightVal = scale.get_units(times);
+    log("weight: " + String(weightVal) + "g",1);
+  }else {
+  log("LoadCell not found.", 1);
+  }
 }
 
 HX711_module loadCellADC;

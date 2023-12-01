@@ -41,6 +41,14 @@ class WireScan
     void i2cScan();
 };
 
+class systemDate
+{
+  public:
+    void printRtcDate();
+    void printGnssDate();
+  private:
+};
+
 extern intLED intBlueLED;
 extern WireScan i2cScan;
 

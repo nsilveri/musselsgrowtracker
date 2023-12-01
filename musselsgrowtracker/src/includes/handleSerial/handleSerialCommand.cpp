@@ -68,11 +68,15 @@ void handleSerialCommand(char command) {
       break;
 
     case 'c':
-      loadCell.read_weight();
+      loadCell.read_weight(100);
       break;
 
     case 'x':
       loadCell.setOffset();
+      break;
+
+    case 'P':
+      loadCell.print_tare();
       break;
 
     case 'b':
@@ -83,9 +87,12 @@ void handleSerialCommand(char command) {
       loadCell.setScale(bottleWeight);
       break;
 
+    case 'T':
+      gnssHandler.updateRTCViaGNSS();
+      break;
+
     case 'f':
       log("reading intMemory info...", 1);
-      intMemory.init();
       intMemory.powerUp();
       intMemory.getChipID();
       intMemory.powerDown();
@@ -101,6 +108,10 @@ void handleSerialCommand(char command) {
 
     case 'v':
       getVDDA();
+      break;
+
+    case 'k':
+      Wire.end();
       break;
 
     case 't':

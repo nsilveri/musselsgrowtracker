@@ -70,6 +70,7 @@ float getTemp()
 void intLED::begin()
 {
   pinMode(intLedPin, OUTPUT);
+  digitalWrite(intLedPin, LED_STATE);
 }
 
 void intLED::intLED_on()
