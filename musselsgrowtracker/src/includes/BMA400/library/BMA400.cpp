@@ -204,6 +204,7 @@ int16_t BMA400::readBMA400TempData()
 {
   uint8_t temp = readByte(BMA400_ADDRESS, BMA400_TEMP_DATA);    // Read the raw data register  
   int16_t tmp = (int16_t) ( ((int16_t)temp << 8) | 0x00) >> 8;  // Turn into signed 8-bit temperature value
+  Serial.print(tmp);
   return tmp;
   }
 
@@ -280,5 +281,10 @@ void BMA400::I2Cscan()
   uint8_t i = 0;
   Wire.requestFrom(address, count);  // Read bytes from slave register address 
   while (Wire.available()) {
-        dest[i++] = Wire.read(); }   // Put read results in the Rx buffer
+        dest[i++] = Wire.read(); 
+  }   // Put read results in the Rx buffer
+  for (uint8_t i = 0; i < sizeof(dest); i ++){
+      Serial.print(dest[i]);
+  }
+  Serial.println();
 }

@@ -3,22 +3,23 @@
 
 #include "Arduino.h"
 
-#define MOSFET_PIN 9
-
 class LoadCell
 {
     public:
         void begin();
-        bool mosfet_state_change(bool STATE);
-        bool turn_on();
-        bool turn_on_off();
-        bool turn_off();
+        //bool mosfet_state_change(bool STATE);
+        //bool turn_on();
+        //bool turn_on_off();
+        //bool turn_off();
         void setOffset();
         void setScale(float weightKnown);
         void calibrate(float weightKnown);
-        void read_weight(byte times);
+        float read_weight(byte times);
+        void setEmptyWeight();
         void print_tare();
+        float get_LastWeightReading();
     private:
+        float lastWeightReading = -1;
 
 };
 

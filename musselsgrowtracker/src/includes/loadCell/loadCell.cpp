@@ -1,24 +1,26 @@
 #include "loadCell.h"
 #include "hx711_basic.h"
+#include "..\utilities\utilities.h"
 //#include <Wire.h>
 
-bool MOSFET_STATE = true;
 float weightKnown = 1000;
 float scaleFactorDefault = 43.34;
+float emptyWeight = 0.00;
 
 
 void LoadCell::begin()
 {
-    pinMode(MOSFET_PIN, OUTPUT);
-    digitalWrite(MOSFET_PIN, MOSFET_STATE);
+    //mosfetSwitch.turn_on();
     loadCellADC.begin();
 }
 
+/*
 bool LoadCell::mosfet_state_change(bool STATE)
 {
     digitalWrite(MOSFET_PIN, STATE);
     return STATE;
 }
+
 
 bool LoadCell::turn_on()
 {   
@@ -37,21 +39,28 @@ bool LoadCell::turn_off()
     MOSFET_STATE = false;
     mosfet_state_change(MOSFET_STATE);
 }
+*/
 
 void LoadCell::setOffset()
 {
+    mosfetSwitch.turn_on();
     loadCellADC.setOffset();
+    mosfetSwitch.turn_off();
 }
 
 void LoadCell::calibrate(float weightKnown)
 {
+    mosfetSwitch.turn_on();
     loadCellADC.calibrate(weightKnown);
+    mosfetSwitch.turn_off();
 }
 
 
 void LoadCell::setScale(float weightKnown)
 {
+    mosfetSwitch.turn_on();
     loadCellADC.setScale(weightKnown);
+    mosfetSwitch.turn_off();
 }
 
 void LoadCell::print_tare()
@@ -59,14 +68,24 @@ void LoadCell::print_tare()
     loadCellADC.printTare();
 }
 
-void LoadCell::read_weight(byte times)
+float LoadCell::read_weight(byte times)
 {   
-    //loadCellADC.begin();
-    //loadCellADC.printTare();
-    loadCellADC.getWeight(times);
-    //loadCellADC.readAverage(20);
+    mosfetSwitch.turn_on();
+    lastWeightReading = loadCellADC.getWeight(times);
+    mosfetSwitch.turn_off();
+    return lastWeightReading;
 }
 
+float LoadCell::get_LastWeightReading()
+{   
+    return lastWeightReading;
+}
 
+void LoadCell::setEmptyWeight()
+{
+    mosfetSwitch.turn_on();
+    emptyWeight = loadCellADC.setEmptyWeight();
+    mosfetSwitch.turn_off();
+}
 
 LoadCell loadCell;

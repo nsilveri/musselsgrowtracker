@@ -8,6 +8,7 @@
 extern bool DEBUG;
 extern uint8_t LOG_LEV;
 extern volatile uint8_t Step;
+extern bool enableRoutine;
 
 void handleSerialCommand(char command);
 

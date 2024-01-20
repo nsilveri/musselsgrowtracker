@@ -10,8 +10,9 @@ class HX711_module
         void setOffset();
         void setScale(float weightKnown);
         void calibrate(float weightKnown);
-        void getWeight(byte times);
+        float getWeight(byte times);
         void readAverage(uint8_t nSamples = 20);
+        float setEmptyWeight();
 };
 
 extern HX711_module loadCellADC;

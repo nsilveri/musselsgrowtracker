@@ -1,53 +1,78 @@
-#ifndef GNSS_FUNCTIONS_H
-#define GNSS_FUNCTIONS_H
+#ifndef GNSS_HANDLER_H
+#define GNSS_HANDLER_H
 
-#include <Arduino.h>
-#include <STM32L0.h>
-#include "GNSS.h"
-#include <RTC.h>
+#include "library\GNSS.h"
 #include "dateConverter.h"
+#include <RTC.h>
+#include <stm32l0_gpio.h>
+#include <stm32l0_exti.h>
+
+#define INITIAL_RTC_YEAR 2000
 
 struct LocationData {
-  double lat;
-  double lon;
-  float alt;
-  uint8_t satNum;
-  float displacement;
+    double lat;
+    double lon;
+    double alt;
+    int    satNum;
+    double displacement;
 
-  bool operator!=(const LocationData& other) const {
+    bool operator!=(const LocationData& other) const {
     return lat != other.lat || lon != other.lon || alt != other.alt || satNum != other.satNum;
     }
-  bool operator==(const LocationData& other) const {
-    return lat == other.lat && lon == other.lon && alt == other.alt && satNum == other.satNum;
-  }
-};
 
-extern LocationData invalidLocVal;
-extern LocationData prevLocVal;
-extern LocationData currLocVal;
-extern const uint8_t tolerance;
+    bool operator==(const LocationData& other) const {
+      return lat == other.lat && lon == other.lon && alt == other.alt && satNum == other.satNum;
+    }
+};
 
 class GNSSHandler {
 public:
-  GNSSHandler();
-  void begin();
-  void update();
-  void enable();
-  void disable();
-  bool isTracking();
-  GNSSLocation getLocation();
-  double calculateDistance(const LocationData& loc1, const LocationData& loc2);
-  bool readPositioningData();
-  void readGpsTime();
-  void updateRTCViaGNSS();
-  void printRTC();
-  bool displacementAlert(uint8_t movement, uint8_t tolerance);
+    //void    initializeGNSSPins();
+    void    initializeArduinoGNSSPins();
+    void    initializeStmGNSSPins();
+    void    configureGNSS();
+    bool    toggleGNSS(bool enable);
+    bool    displacementAlert(uint8_t movement, uint8_t tolerance);
+    uint8_t getSatNumbers();
+    void    savePreviousPosition();
+    bool    readPositioningData();
+    GNSSLocation getLocation();
+    double  toRadians(double degree);
+    double  calculateDistance(const LocationData& loc1, const LocationData& loc2);
+    String  getRTCString();
+    void    printRTC();
+    bool    RTCFix();
+    void    readGpsTime();
+    void    updateRTCViaGNSS();
+    void    update();
+    bool    getGNSSModuleState();
+    bool    getIsLocationFixed();
+    bool    setGNSSStatus(bool STATUS);
+    bool    isTracking();
+    uint8_t setFixQuality(uint8_t QUALITY_TYPE);
+    uint8_t setFixLocType(uint8_t FIX_TYPE);
+
 private:
-  volatile bool tracking;
-  double toRadians(double degree);
-  void savePreviousPosition();
+    bool tracking;
+    //timerManager gnssTimer;
+    //GNSSLocation currentLocation;
+    //GNSSSatellites GNSSSat;
+    //GNSSClass GNSS;
+
+    const uint8_t tolerance = 5;
+    const uint8_t RTC_GPStolerance = 5;
+
+    unsigned long GNStimestamp;
+    unsigned long RTCtimestamp;
+
+    bool isLocationFixed;
+    bool GNSS_MODULE_ON_OFF;
+
+    LocationData invalidLocVal;
+    LocationData prevLocVal;
+    LocationData currLocVal;
 };
 
 extern GNSSHandler gnssHandler;
 
-#endif  // GNSS_FUNCTIONS_H
+#endif // GNSS_HANDLER_H

@@ -30,6 +30,12 @@ Sketch based on the work of Pete (El Supremo) as follows:
 #include "SPIFlash.h"
 #include "SPI.h"
 
+#define csPin 25 // SPI Flash chip select pin
+
+uint16_t page_number = 0;     // set the page number for flash page write
+uint8_t  sector_number = 0;   // set the sector number for sector write
+uint8_t  flashPage[256];      // array to hold the data for flash page write
+
 SPIFlash::SPIFlash(uint8_t CSPIN)
 {
   _csPin = CSPIN; 
@@ -131,8 +137,8 @@ unsigned char SPIFlash::flash_read_status(void)
 // This can't do a write_pause
   SPI.beginTransaction(SPISettings(50000000, MSBFIRST, SPI_MODE0));
   digitalWrite(_csPin, LOW);  
-  SPI.transfer(CMD_READ_STATUS_REG);
-  c = SPI.transfer(0x00);
+  c = SPI.transfer(CMD_READ_STATUS_REG);
+  //c = SPI.transfer(0x00);
   digitalWrite(_csPin, HIGH);
   SPI.endTransaction();
   return(c);
@@ -346,5 +352,3 @@ void SPIFlash::flash_fast_read_pages(unsigned char *p,int pn,const int n_pages)
   digitalWrite(_csPin, HIGH);
   SPI.endTransaction();
 }
-
-SPIFlash intMemory(25);

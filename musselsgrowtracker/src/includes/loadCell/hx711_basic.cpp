@@ -8,6 +8,7 @@ const int LOADCELL_SCK_PIN  = A3;
 
 long scaleFactor = 43.34;     //default value for YZC-516C
 float defaultOffset = 49133.0; //default value for YZC-516C
+float defaultEmptyWeight = 0.00;
 
 HX711 scale;
 
@@ -41,7 +42,7 @@ void HX711_module::calibrate(float weightKnown)
 
 void HX711_module::printTare()
 {
-  log("offset: " + String(scale.get_offset()) + " | scale: " + String(scale.get_scale()) + " | units: " + String(scale.get_units()) + " | value: " + String(scale.get_value()), 1);
+  log("offset: " + String(scale.get_offset()) + " | scale: " + String(scale.get_scale()) + " | units: " + String(scale.get_units()) + " | value: " + String(scale.get_value()) + " | emptyWeight: " + String(defaultEmptyWeight), 1);
 }
 
 void HX711_module::setScale(float weightKnown)
@@ -74,9 +75,10 @@ void HX711_module::setOffset()
     log(String(i), 1);
     delay(1000);
   }
-  scale.tare();  // Esegui la tara
+  log("Reading weight with " + String(100) + " samples...", 1);
+  scale.tare(100);  // Esegui la tara
   
-  log("Offset calibration complete.", 1);
+  log("\nOffset calibration complete.", 1);
   //HX711_module::read();
 }
 
@@ -102,15 +104,28 @@ void HX711_module::readAverage(uint8_t nSamples) {
   }
 }
 
-void HX711_module::getWeight(byte times)
+float HX711_module::getWeight(byte times)
 { 
   if (scale.is_ready()) {
-    log("Reading weight...", 1);
+    log("Reading weight with " + String(times) + " samples...", 1);
     float weightVal = scale.get_units(times);
-    log("weight: " + String(weightVal) + "g",1);
+    //weightVal = weightVal - defaultEmptyWeight;
+    if(weightVal < 0.00){
+        weightVal = 0.00;
+        log("Calibration is advisable (command: 'x')",1);
+    }
+    log("Weight: " + String(weightVal) + "g",1);
+    return weightVal;
   }else {
   log("LoadCell not found.", 1);
   }
+}
+
+float HX711_module::setEmptyWeight()
+{
+    defaultEmptyWeight = getWeight(100);
+    log("Empty weight: " + String(defaultEmptyWeight) + "g", 1);
+    return defaultEmptyWeight;
 }
 
 HX711_module loadCellADC;
