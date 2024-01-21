@@ -10,11 +10,11 @@
 #define INITIAL_RTC_YEAR 2000
 
 struct LocationData {
-    double lat;
-    double lon;
-    double alt;
+    double  lat;
+    double  lon;
+    double  alt;
     int    satNum;
-    double displacement;
+    float displacement;
 
     bool operator!=(const LocationData& other) const {
     return lat != other.lat || lon != other.lon || alt != other.alt || satNum != other.satNum;
@@ -25,9 +25,15 @@ struct LocationData {
     }
 };
 
+struct LocationEEPROMData {
+    double  lat;
+    double  lon;
+};
+
 class GNSSHandler {
 public:
     //void    initializeGNSSPins();
+    void    restoreOldLoc();
     void    initializeArduinoGNSSPins();
     void    initializeStmGNSSPins();
     void    configureGNSS();
@@ -39,6 +45,7 @@ public:
     GNSSLocation getLocation();
     double  toRadians(double degree);
     double  calculateDistance(const LocationData& loc1, const LocationData& loc2);
+    bool    distanceEepromCurrentLoc();
     String  getRTCString();
     void    printRTC();
     bool    RTCFix();
@@ -49,8 +56,12 @@ public:
     bool    getIsLocationFixed();
     bool    setGNSSStatus(bool STATUS);
     bool    isTracking();
+    double  getInvalidLat();
+    double  getInvalidLon();
     uint8_t setFixQuality(uint8_t QUALITY_TYPE);
     uint8_t setFixLocType(uint8_t FIX_TYPE);
+    void saveOnEeprom(double lat = 0, double lon = 0);
+    void restoreFromEeprom(double* lat, double* lon);
 
 private:
     bool tracking;
@@ -58,7 +69,6 @@ private:
     //GNSSLocation currentLocation;
     //GNSSSatellites GNSSSat;
     //GNSSClass GNSS;
-
     const uint8_t tolerance = 5;
     const uint8_t RTC_GPStolerance = 5;
 

@@ -9,6 +9,7 @@
 //#include "src\includes\BMA280\BMA280Functions.h"
 #include "src\includes\GY521\GY521Sensor.h"
 #include <RTC.h>
+#include "src\includes\ECCProcessor\ECCProcessor.h"
 
 #define SLEEP 0
 #define RTC_INT 1
@@ -69,6 +70,7 @@ void setup() {
   mosfetSwitch.begin();
   mosfetSwitch.turn_on();
 
+  gnssHandler.restoreOldLoc();
   gnssHandler.toggleGNSS(true);
 
   intMemory.init();
@@ -83,7 +85,9 @@ void setup() {
   //gnssHandler.initializeArduinoGNSSPins();
   gnssHandler.initializeStmGNSSPins();
   gnssHandler.configureGNSS();
+
   LoRaWANManager.begin();
+  //eccProcessor.setupECC();
 
   Step = 0;
 
@@ -120,23 +124,24 @@ void GNSS_routine()
 {  
   bool GNSFix = gnssHandler.getIsLocationFixed();
   bool RTCFix = gnssHandler.RTCFix();
-
-  log("getIsLocationFixed: " + String(GNSFix) + "\t| RTCFix:" + String(RTCFix), 1);
+  log("Eeprom locVal => lat:" + String(gnssEeprom.readLatitude()) + ", lon: " + String(gnssEeprom.readLongitude()),1);
+  log("getIsLocationFixed: " + String(GNSFix) + "\t RTCFix:" + String(RTCFix), 1);
   
   if(!GNSFix || !RTCFix) //aggiungere lo step
   {
     gnssHandler.toggleGNSS(true);
-    bool GNSSModuleState = gnssHandler.getGNSSModuleState();
-    log("GNSSModuleState: " + String(GNSSModuleState),1);
+    bool GNSSModuleState = gnssHandler.getGNSSModuleState(); 
+    log("GNSSModuleState: " + String(GNSSModuleState),2);
     if(GNSSModuleState) {
-        log("RUN: GNSS update.", 2);
-        gnssHandler.update();  // Update GNSS data
-        //gnssHandler.readGpsTime();
+        log("RUN: GNSS update.", 2); 
+        gnssHandler.update();  // Update GNSS data 
+        //gnssHandler.readGpsTime(); 
     }else log("RUN: GNSS OFF.", 1);
   }else if(GNSFix || RTCFix){
     log("GNS COMPLETED!", 1);
     gnssHandler.setGNSSStatus(false);
-    gnssHandler.toggleGNSS(false);
+    gnssHandler.toggleGNSS(false); 
+    gnssHandler.saveOnEeprom();
     ROUTINE_STEP++;
   }  
 }

@@ -5,6 +5,8 @@
 
 #include <Arduino.h>
 #include <STM32L0.h>
+#include <EEPROMex.h>
+//#include <EEPROM.h>
 
 extern bool DEBUG_MODE;
 extern uint8_t LOG_LEVEL;
@@ -12,6 +14,11 @@ extern volatile uint8_t Step;
 extern bool DEBUG;
 extern bool LOG_END_LOOP;
 extern String LOG_END_LINE_STRING;
+
+class bytePackaging {
+  public:
+    byte packData(byte otherData);
+};
 
 class timerManager {
 public:
@@ -117,6 +124,28 @@ class LoRaPayload {
       size_t dataMsgSize;
 };
 
+class GNSSEeprom {
+  public:
+      void   saveGNSSCoordinates(double lat, double lon);
+      double readLatitude();
+      double readLongitude();
+      //void   formatEEPROM();
+
+  private:
+      void EEPROMWrite(int address, double value);
+      double EEPROMRead(int address);
+      const uint8_t EEPROM_START_LOC_BYTE = 0;
+      uint8_t latAddress = 0;
+      uint8_t lonAddress = 10;
+};
+
+class powerManagement {
+  public:
+      float getVDDA();
+      float getVBAT();
+};
+
+
 extern UID getIDDevice;
 extern intLED intBlueLED;
 extern WireScan i2cScan;
@@ -124,6 +153,8 @@ extern mosSwitch mosfetSwitch;
 extern UID uidCode;
 extern ethTransaction ethTx;
 extern LoRaPayload MSGPayload;
+extern GNSSEeprom gnssEeprom;
+extern powerManagement pwrMan;
 //extern timerManager timerMan;
 
 #endif // UTILITIES_H

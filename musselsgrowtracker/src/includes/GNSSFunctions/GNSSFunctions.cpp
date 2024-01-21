@@ -5,6 +5,7 @@
 #include "..\utilities\utilities.h"
 #include "dateConverter.h"
 #include <RTC.h>
+#include "..\utilities\utilities.h"
 //#include "..\..\STM32\STM32L0\system\STM32L0xx\Include\stm32l0_gpio.h"
 //#include "..\..\STM32\STM32L0\system\STM32L0xx\Include\stm32l0_exti.h"
 //#include "library\stm32\include\stm32l0_exti.h"
@@ -20,6 +21,7 @@
 #define STM32L0_EXTI_CONTROL_PRIORITY_CRITICAL  0x00000000
 
 #define EPE_TOLLERANCE 15
+#define DISTANCE_TOLLERANCE 30
 
 uint16_t stm32_enable_pin = g_APinDescription[GNSS_ENABLE].pin;
 uint16_t stm32_pps_pin    = g_APinDescription[GNSS_PPS].pin;
@@ -45,9 +47,13 @@ bool GNSS_MODULE_ON_OFF = true;
 
 bool GNSS_TOGGLE = true;
 
+bool GNSS_DISPLACEMENT_ALARM = false;
+
 LocationData invalidLocVal = {0.0000000, 0.0000000, 0.000, 0.000};
 LocationData prevLocVal = invalidLocVal;
 LocationData currLocVal = invalidLocVal;
+LocationData eepromLocVal = invalidLocVal;
+LocationEEPROMData LocValOnEEPROM;
 
 void int_pps(void) {
   pps_irq = true;
@@ -64,6 +70,19 @@ void GNSSHandler::initializeArduinoGNSSPins() {
     digitalWrite(GNSS_BACKUP, HIGH);
 }
 
+void GNSSHandler::restoreOldLoc() {
+    eepromLocVal.lat = gnssEeprom.readLatitude();
+    eepromLocVal.lon = gnssEeprom.readLongitude();
+    log("prevLoc from EEPROM: " + String(prevLocVal.lat) + ", " + String(prevLocVal.lat), 1);
+    delay(3000);
+}
+
+double  GNSSHandler::getInvalidLat() {
+    return invalidLocVal.lat;
+}
+double  GNSSHandler::getInvalidLon() {
+    return invalidLocVal.lon;
+}
 
 void GNSSHandler::initializeStmGNSSPins() {
   //backup pin
@@ -115,6 +134,7 @@ bool GNSSHandler::toggleGNSS(bool enable) {
 bool GNSSHandler::displacementAlert(uint8_t movement, uint8_t tolerance) {
     if (movement >= tolerance) {
         log("Displacement alarm!!!", 1);
+        //GNSS_DISPLACEMENT_ALARM = true;
         return true;
     }
     return false;
@@ -134,11 +154,28 @@ void GNSSHandler::savePreviousPosition() {
     prevLocVal.satNum = currLocVal.satNum;
 }
 
+void GNSSHandler::saveOnEeprom(double lat, double lon) {
+    if(lat == 0 && lon == 0) {
+        gnssEeprom.saveGNSSCoordinates(currLocVal.lat, currLocVal.lon);
+    }else gnssEeprom.saveGNSSCoordinates(lat, lon);
+}
+
+void GNSSHandler::restoreFromEeprom(double* lat, double* lon) {
+    if (lat != nullptr) {
+        *lat = gnssEeprom.readLatitude();
+    }
+    if (lon != nullptr) {
+        *lon = gnssEeprom.readLongitude();
+    }
+}
+
 bool GNSSHandler::readPositioningData() {
     GNSSLocation currentLocation = getLocation();
-    log("currentLocation:\n\tLAT:" + String(currentLocation.latitude()) + "\n\tLON:" + String(currentLocation.longitude()), 1);
+    log("currentLocation:\n\tLAT:" + String(currLocVal.lat, 6) + "\n\tLON:" + String(currLocVal.lon, 6), 1);
 
+    
     savePreviousPosition();
+    
 
     currLocVal.lat = currentLocation.latitude();
     currLocVal.lon = currentLocation.longitude();
@@ -165,6 +202,11 @@ bool GNSSHandler::readPositioningData() {
     }
 
     currLocVal.displacement = distance;
+
+    if(distance <= 2)
+    {
+        gnssEeprom.saveGNSSCoordinates(prevLocVal.lat, prevLocVal.lon);
+    }
 
     if (DEBUG_MODE) {
         snprintf(currLocStr, sizeof(currLocStr), "CURRENT LOCATION: %.7f,%.7f,%.3f SATELLITES=%d DISPLACEMENT: %.2f meters",
@@ -293,10 +335,21 @@ void GNSSHandler::updateRTCViaGNSS() {
     }
 }
 
+bool GNSSHandler::distanceEepromCurrentLoc()
+{
+    float distance = calculateDistance(eepromLocVal, prevLocVal);
+    if(distance >= DISTANCE_TOLLERANCE) {
+        log("ALARM! displacement eepromLocVal <=> currLocVal > DISTANCE_TOLLERANCE (" + String(distance) + ")", 1);
+        delay(2000);
+        return true;
+    }
+    return false;
+}
+
 void GNSSHandler::update() {
     uint8_t SatNum = GNSSSat.count();
 
-    log("UPDATE: GNSS_MODULE_ON_OFF: " + String(GNSS_MODULE_ON_OFF), 1);
+    log("UPDATE: GNSS_MODULE_ON_OFF: " + String(GNSS_MODULE_ON_OFF), 2);
 
     if (!GNSS_MODULE_ON_OFF) {
         log("Enabling GNSS...", 1);
@@ -317,6 +370,9 @@ void GNSSHandler::update() {
         float EPE = currentLocation.ehpe();
 
         if (EPE < 15.0)
+            if(distanceEepromCurrentLoc()) {
+                GNSS_DISPLACEMENT_ALARM = true;
+            }
             toggleGNSS(false);
             return;
     }

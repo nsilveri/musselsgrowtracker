@@ -1,5 +1,3 @@
-// handleSerialCommand.cpp
-
 #include "handleSerialCommand.h"
 #include "..\GNSSFunctions\GNSSFunctions.h"
 #include "..\SPI\SPIFlash.h"
@@ -33,11 +31,36 @@ byte* dataMsg = nullptr;;
 String msgToSendStr;
 String msgToSendHex;
 
+const char* message = "Messaggio segreto";
+size_t messageLength = strlen(message);
+uint8_t encryptedMessage[128]; // Assicurati che sia abbastanza grande
+size_t encryptedLength = sizeof(encryptedMessage);
+
 void handleSerialCommand(char command) {
   switch (command) {
     case 'u':
       log(uidCode.get_UID_String(), 1);
     break;
+
+    /*
+    case 'R':
+      log("Format EEPROM", 1);
+      gnssEeprom.formatEEPROM();
+      gnssEeprom.saveGNSSCoordinates(gnssHandler.getInvalidLat(), gnssHandler.getInvalidLon());
+      delay(1000);
+      log("EEPROM formatted", 1);
+      log("lat: " + String(gnssEeprom.readLatitude()) + ", lon: " + String(gnssEeprom.readLongitude()), 1);
+    break;
+    */
+
+    case 'r':
+      log("Data on EEPROM: " + String(gnssEeprom.readLatitude(), 6) + ", " + String(gnssEeprom.readLongitude(), 6), 1);
+    break;
+    
+    //case 'y':
+    //  eccProcessor.encryptMessage((const uint8_t*)message, messageLength, encryptedMessage);
+    //
+    //  break;
     
     case 'y':
       if(EncryptionMode)
@@ -76,73 +99,6 @@ void handleSerialCommand(char command) {
         delete[] dataMsg;
       }
     break;
-    
-    /*
-    case 'y':
-    if (EncryptionMode) {
-      log("ECC Encryption selected", 1);
-      delay(2000);
-      dataMsg = MSGPayload.createDataMsg(getIDDevice.get_UID(), RTC.getEpoch(), loadCell.get_LastWeightReading(), SysStatusByte);
-      msgToSendHex = MSGPayload.bytesToHexString(dataMsg, MSGPayload.get_MsgSize());
-      log("dataMsg HEX: " + msgToSendHex, 1);
-
-      // Genera la chiave privata e pubblica con tinyECC
-      const struct uECC_Curve_t *curve = uECC_secp160r1();
-      uint8_t private_key[21];
-      uint8_t public_key[40];
-      uECC_make_key(public_key, private_key, curve);
-
-      // Condividi la chiave pubblica con l'altro endpoint se necessario
-
-      // Crittografa il messaggio utilizzando tinyECC
-      uint8_t ciphertext[MSGPayload.get_MsgSize()];
-      int encrypted = uECC_encrypt(public_key, (const uint8_t *)msgToSendHex.c_str(), MSGPayload.get_MsgSize(), ciphertext, curve);
-
-      if (encrypted == 1) {
-        // Crea una stringa esadecimale a partire dal testo crittografato
-        String encryptedHex = MSGPayload.bytesToHexString(ciphertext, MSGPayload.get_MsgSize());
-        log("Encrypted Text HEX: " + encryptedHex, 1);
-
-        // Decrittografia del messaggio (per dimostrazione)
-        uint8_t decrypted[MSGPayload.get_MsgSize()];
-        int decrypted_size = uECC_decrypt(private_key, ciphertext, MSGPayload.get_MsgSize(), decrypted, curve);
-
-        if (decrypted_size > 0) {
-          String decryptedText = String((char *)decrypted, decrypted_size);
-          log("Decrypted Text: " + decryptedText, 1);
-        } else {
-          log("Decryption failed!", 1);
-        }
-      } else {
-        log("Encryption failed!", 1);
-      }
-
-      // Genera e verifica la firma ECC (per dimostrazione)
-      uint8_t signature[64];
-      uECC_sign(private_key, (const uint8_t *)msgToSendHex.c_str(), MSGPayload.get_MsgSize(), signature, curve);
-      bool isSignatureValid = uECC_verify(public_key, (const uint8_t *)msgToSendHex.c_str(), MSGPayload.get_MsgSize(), signature, curve);
-
-      String additionalInfo;
-      if (isSignatureValid) {
-        additionalInfo = " | Valid!";
-      } else {
-        additionalInfo = " | Not valid!";
-      }
-
-      log("Signature ECC: " + String((char *)signature, 64) + additionalInfo, 1);
-
-      // Deallocazione delle risorse
-      delete[] dataMsg;
-
-    } else if (!EncryptionMode) {
-      log("Ethereum-RPL encryption selected", 1);
-      delay(2000);
-      dataMsg = MSGPayload.createDataMsg(getIDDevice.get_UID(), RTC.getEpoch(), loadCell.get_LastWeightReading(), SysStatusByte);
-      ethTx.CreateRawTransaction(dataMsg, MSGPayload.get_MsgSize());
-      delete[] dataMsg;
-    }
-    break;
-    */
 
     case 'q':
       dataMsg = MSGPayload.createDataMsg(getIDDevice.get_UID(), RTC.getEpoch(), loadCell.get_LastWeightReading(), SysStatusByte);
@@ -260,8 +216,12 @@ void handleSerialCommand(char command) {
       }
       break;
 
-    case 'b':
+    case 'B':
       loadCell.calibrate(bottleWeight);
+      break;
+
+    case 'b':
+      pwrMan.getVBAT();
       break;
 
     case 'z':
@@ -270,15 +230,6 @@ void handleSerialCommand(char command) {
 
     case 'T':
       gnssHandler.updateRTCViaGNSS();
-      break;
-
-    case 'f':
-      log("reading intMemory info...", 1);
-      intMemory.init();      // start SPI
-      intMemory.powerUp();   // MX25R6435FZAI defaults to power down state
-      intMemory.getChipID(); // Verify SPI flash communication
-      log("flash_read_status: " + String(intMemory.flash_read_status()), 1);
-      intMemory.powerDown(); // power down SPI flash
       break;
 
     case 'F':
@@ -295,7 +246,7 @@ void handleSerialCommand(char command) {
       break;
 
     case 'v':
-      getVDDA();
+      pwrMan.getVDDA();
       break;
     /*
     case 'k':

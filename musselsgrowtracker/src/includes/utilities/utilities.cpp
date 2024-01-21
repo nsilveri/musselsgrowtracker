@@ -13,8 +13,31 @@ bool LOG_END_LOOP = false;
 String LOG_END_LINE_STRING = "END_LINE";
 String LOG_WAIT_STRING = "wait";
 
+float batt = 0.00;
+uint8_t batteryPercentage = 0;
+
 #define intLedPin 10
 bool LED_STATE = false;
+
+byte bytePackaging::packData(byte otherData) {
+    byte compressedBatteryLevel;
+    if (batteryPercentage >= 75) {
+        compressedBatteryLevel = 3; // 75%
+    } else if (batteryPercentage >= 50) {
+        compressedBatteryLevel = 2; // 50%
+    } else if (batteryPercentage >= 25) {
+        compressedBatteryLevel = 1; // 25%
+    } else {
+        compressedBatteryLevel = 0; // 10% o meno
+    }
+
+    // Assicurati che otherData occupi solo 6 bit
+    otherData &= 0x3F; // 0x3F è 00111111 in binario
+
+    // Combina i dati
+    return (compressedBatteryLevel << 6) | otherData;
+}
+
 
 byte* UID::get_UID() {
     static uint32_t UID[3] = {0, 0, 0};
@@ -155,11 +178,21 @@ void STM32L0_Voltage::(void(*callback)(void))
 }
 */
 
-float getVDDA()
+float powerManagement::getVDDA()
 {
   float VDDA = STM32L0.getVDDA();
   log("VDDA= " + String(VDDA), 1);
   return VDDA;
+}
+
+float powerManagement::getVBAT()
+{
+  batt = STM32L0.getVBAT();
+  batteryPercentage = map(batt, 3.2, 4.2, 0, 100);
+  if(batt > 3) {
+    log("Bat= " + String(batt) + " " + String(batteryPercentage) + "%", 1);
+  }else log("Bat= No battery detected!", 1);
+  return batt;
 }
 
 float getTemp()
@@ -411,6 +444,56 @@ String LoRaPayload::bytesToString(const byte* buffer, size_t bufferSize) {
     return result; // Rimuove lo spazio finale
 }
 
+void GNSSEeprom::saveGNSSCoordinates(double lat, double lon) {
+    EEPROMWrite(latAddress, lat); // Salva la latitudine all'indirizzo 0
+    EEPROMWrite(lonAddress, lon); // Salva la longitudine all'indirizzo successivo
+}
+
+double GNSSEeprom::readLatitude() {
+    return EEPROMRead(latAddress); // Legge la latitudine dall'indirizzo 0
+}
+
+double GNSSEeprom::readLongitude() {
+    return EEPROMRead(lonAddress); // Legge la longitudine dall'indirizzo successivo
+}
+
+void GNSSEeprom::EEPROMWrite(int address, double value) {
+    //byte* p = (byte*)(void*)&value;
+    //for (int i = 0; i < sizeof(value); i++) {
+    EEPROM.updateDouble(address, value);
+    //}
+}
+
+double GNSSEeprom::EEPROMRead(int address) {
+    double value = EEPROM.readDouble(address++); //0.0;
+    //byte* p = (byte*)(void*)&value;
+    //for (int i = 0; i < sizeof(value); i++) {
+    //    //*p++ = EEPROM.read(address++);
+    //    *p++ = EEPROM.readDouble(address++);
+    //}
+    return value;
+}
+
+/*
+void GNSSEeprom::EEPROMWrite(int address, double value) {
+
+    int convertedValueInt = static_cast<int>(value * 10000000);
+    EEPROM.writeInt(address, convertedValueInt);
+    //}
+}
+
+double GNSSEeprom::EEPROMRead(int address) {
+    int convertedValueInt = EEPROM.readInt(address++);
+    double value = static_cast<double>(convertedValueInt) / 10000000;
+    return value;
+}
+
+void GNSSEeprom::formatEEPROM() {
+    for (int i = 0; i < EEPROM.length(); i++) {
+        EEPROM.updateDouble(i, 0xFF); // Imposta ogni cella a 0xFF
+    }
+}
+*/
 
 //timerManager timerMan;
 UID getIDDevice;
@@ -419,3 +502,5 @@ ethTransaction ethTx;
 mosSwitch mosfetSwitch;
 intLED intBlueLED;
 WireScan i2cScan;
+GNSSEeprom gnssEeprom;
+powerManagement pwrMan;
