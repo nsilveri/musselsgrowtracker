@@ -6,6 +6,8 @@
 #include <Arduino.h>
 #include <STM32L0.h>
 #include <EEPROMex.h>
+#include "..\batteryManager\batteryMan.h"
+#include "..\LoRa\LoRaWANLib.h"
 //#include <EEPROM.h>
 
 extern bool DEBUG_MODE;
@@ -17,7 +19,7 @@ extern String LOG_END_LINE_STRING;
 
 class bytePackaging {
   public:
-    byte packData(byte otherData);
+    byte packData();
 };
 
 class timerManager {
@@ -112,14 +114,30 @@ public:
 
 class LoRaPayload {
   public:
-      byte* createDataMsg(const byte* SerialID, uint32_t TimestampLinux, uint16_t LoadCellMeasurement, byte SysStatus);
+      byte* createDataMsg(const byte* SerialID, uint32_t TimestampLinux, byte* GpsData, uint16_t LoadCellMeasurement, byte SysStatus);
+      
       String bytesToHexString(const byte* buffer, size_t bufferSize);
       String bytesToString(const byte* buffer, size_t bufferSize);
+      
       size_t get_MsgSize();
-      byte* get_DataMsg() const; // Aggiunto il metodo per ottenere dataMsg
+      byte* get_DataMsg() const;
+      
+      String get_msgStr();
+      String get_msgHex();
+
+      void set_msgByte(byte* msg, size_t msgSize);
+
+      String set_msgStr(String msg);
+      String set_msgHex(String msg);
+
       void logBytes(const byte* data, size_t size, const char* message);
 
   private:
+      void clearData();
+
+      String msgToSendStr;
+      String msgToSendHex;
+
       byte* dataMsg;
       size_t dataMsgSize;
 };
@@ -139,12 +157,19 @@ class GNSSEeprom {
       uint8_t lonAddress = 10;
 };
 
-class powerManagement {
+class MSGSend {
   public:
-      float getVDDA();
-      float getVBAT();
+      void sendMsg();
+      void set_EccSign();
+      void set_EthSign();
+  private:
+      bool ECC_MODE = true;
+      bool ETH_MODE = false;
+      bool SEND_MODE = ECC_MODE;
+      
+      void sendMsgETH();
+      void sendMsgECC();
 };
-
 
 extern UID getIDDevice;
 extern intLED intBlueLED;
@@ -154,7 +179,8 @@ extern UID uidCode;
 extern ethTransaction ethTx;
 extern LoRaPayload MSGPayload;
 extern GNSSEeprom gnssEeprom;
-extern powerManagement pwrMan;
+extern bytePackaging bytePack;
+extern MSGSend msgService;
 //extern timerManager timerMan;
 
 #endif // UTILITIES_H

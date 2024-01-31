@@ -128,15 +128,18 @@ void LoRaWANLib::getInfo()
 
 
 
-void LoRaWANLib::sendMessage(int serialID, unsigned long timestamp, long hx711Value, byte systemState) {
+void LoRaWANLib::sendMessage(const byte* payload, size_t payloadSize) {
+    log("MSG sendMessage: " + MSGPayload.bytesToHexString(payload, payloadSize), 1);
+
     bool joinState = LoRaWAN.joined();
     bool busyState = LoRaWAN.busy(); 
+
 
     log("Pre-send data LoRa states: -> Join:" + String(joinState) + " - Busy:" + String(busyState), 2);
 
     if(!joinState && autoRejoin)
     {
-        log("Rejoing OTAA...", 1);
+        log("Rejoining OTAA...", 1);
         LoRaWAN.rejoinOTAA();
     }
 
@@ -147,32 +150,22 @@ void LoRaWANLib::sendMessage(int serialID, unsigned long timestamp, long hx711Va
 
         while (!sent) {
             if (!LoRaWAN.busy()) {
-                log("SerialID=" + String(serialID), 1);
-                log("Timestamp=" + String(timestamp), 1);
-                log("HX711 Value=" + String(hx711Value), 1);
-                log("System State=" + String(systemState), 1);
-
-                // Creating payload
-                byte payload[18];
-
-                // Insert data into the payload
-                memcpy(payload, &serialID, sizeof(serialID));
-                memcpy(payload + sizeof(serialID), &timestamp, sizeof(timestamp));
-                memcpy(payload + sizeof(serialID) + sizeof(timestamp), &hx711Value, sizeof(hx711Value));
-                payload[sizeof(serialID) + sizeof(timestamp) + sizeof(hx711Value)] = systemState;
 
                 // Create a hexadecimal string from the payload
                 String payloadStr = "";
-                for (int i = 0; i < sizeof(payload); i++) {
-                    char hex[3];
-                    sprintf(hex, "%02X", payload[i]);
-                    payloadStr += hex;
-                }
+                //for (size_t i = 0; i < payloadSize; i++) {
+                //    char hex[3];
+                //    sprintf(hex, "%02X", payload[i]);
+                //    payloadStr += hex;
+                //}
+                
+                payloadStr = MSGPayload.bytesToHexString(payload, payloadSize);
 
                 log("PAYLOAD: '" + payloadStr + "'", 1);
+                log("PAYLOAD_SIZE: '" + String(payloadSize) + "'", 1);
 
                 LoRaWAN.beginPacket();
-                LoRaWAN.write(payload, sizeof(payload));
+                LoRaWAN.write(payload, payloadSize);
                 LoRaWAN.endPacket();
 
                 sent = true;  // Exit the loop once the message is sent
@@ -185,8 +178,8 @@ void LoRaWANLib::sendMessage(int serialID, unsigned long timestamp, long hx711Va
     } else {
         log("LoRa not joined!", 1);
     }
-
 }
+
 //NNSXS.E366ZCJCDOYKDKH5K5J7VBIH456HBYAD6M4R73Y.QXWBSJLNW63TCE3EOBDCTRB4TEJPTN2X2FHSTZJWG7VNQZT7DLYQ
 //LoRaWANLib LoRaWANManager("mussels-grow-tracker", "NNSXS.E366ZCJCDOYKDKH5K5J7VBIH456HBYAD6M4R73Y.QXWBSJLNW63TCE3EOBDCTRB4TEJPTN2X2FHSTZJWG7VNQZT7DLYQ", "c0ee40ffff296197");
 LoRaWANLib LoRaWANManager("70B3D57ED00093FB", "91923C75B75353C9A669A15B4E96C974", "3739323265378b09");

@@ -6,7 +6,6 @@
 #include "src\includes\loadCell\loadCell.h"
 #include "src\includes\SPI\SPIFlash.h"
 #include "src\includes\LoRa\LoRaWANLib.h"
-//#include "src\includes\BMA280\BMA280Functions.h"
 #include "src\includes\GY521\GY521Sensor.h"
 #include <RTC.h>
 #include "src\includes\ECCProcessor\ECCProcessor.h"
@@ -153,9 +152,19 @@ void LoadCell_routine()
   ROUTINE_STEP++;
 }
 
+
+void SendMessage_routine()
+{
+  msgService.set_EccSign();
+  //msgService.set_EthSign();
+  msgService.sendMsg();
+  ROUTINE_STEP++;
+}
+
+
 void routine() {
   if (!enableRoutine) {
-        return;  // Se la routine non è abilitata, esci dalla funzione
+        return;  // if routine disable exits from function
     }
 
   if(routineTimer.delay(1000)) {
@@ -170,7 +179,11 @@ void routine() {
     }
 
     if(ROUTINE_STEP == 2) {
-      log("Routine compleated\n\tDeep sleeping for 1 min...", 1);
+      SendMessage_routine();
+    }
+
+    if(ROUTINE_STEP == 3) {
+      log("Routine compleate\n\tDeep sleeping for 1 min...", 1);
       ROUTINE_STEP = 0;
       ROUTINE_ITERATION_NUMBER++;
       deep_sleep(60);

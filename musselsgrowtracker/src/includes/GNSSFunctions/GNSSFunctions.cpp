@@ -12,6 +12,7 @@
 //#include "library\stm32\include\stm32l0_gpio.h"
 #include <stm32l0_exti.h>
 #include <stm32l0_gpio.h>
+#include <array>
 
 
 #define GNSS_ENABLE  (5u)
@@ -47,7 +48,7 @@ bool GNSS_MODULE_ON_OFF = true;
 
 bool GNSS_TOGGLE = true;
 
-bool GNSS_DISPLACEMENT_ALARM = false;
+extern bool GNSS_DISPLACEMENT_ALARM = false;
 
 LocationData invalidLocVal = {0.0000000, 0.0000000, 0.000, 0.000};
 LocationData prevLocVal = invalidLocVal;
@@ -57,6 +58,10 @@ LocationEEPROMData LocValOnEEPROM;
 
 void int_pps(void) {
   pps_irq = true;
+}
+
+bool GNSSHandler::getDisplacementStatus() {
+    return GNSS_DISPLACEMENT_ALARM;
 }
 
 void GNSSHandler::initializeArduinoGNSSPins() {
@@ -293,6 +298,43 @@ bool GNSSHandler::RTCFix() {
     return false;
 }
 
+void GNSSHandler::intToByteArray(int val, byte* byteArray) {
+  union {
+    int intValue;
+    byte byteValue[4];
+  } converter;
+
+  converter.intValue = val;
+
+  for (int i = 0; i < 4; i++) {
+    byteArray[i] = converter.byteValue[i];
+  }
+}
+
+byte*  GNSSHandler::generateLoRaMsg() {
+  double latDouble = currLocVal.lat;
+  double lonDouble = currLocVal.lon;
+
+  int latInt = static_cast<int>(latDouble * 10000000.0);
+  int lonInt = static_cast<int>(lonDouble * 10000000.0);
+
+  byte latBytes[4];
+  byte lonBytes[4];
+
+  intToByteArray(latInt, latBytes);
+  intToByteArray(lonInt, lonBytes);
+
+  byte coordinatesBytes[8];
+
+  for (int i = 0; i < 4; ++i) {
+    coordinatesBytes[i] = latBytes[i];
+    coordinatesBytes[i + 4] = lonBytes[i];
+  }
+
+  return coordinatesBytes;
+}
+
+
 void GNSSHandler::readGpsTime() {
     RTCtimestamp = RTC.getEpoch();
     currentLocation = getLocation();
@@ -341,8 +383,10 @@ bool GNSSHandler::distanceEepromCurrentLoc()
     if(distance >= DISTANCE_TOLLERANCE) {
         log("ALARM! displacement eepromLocVal <=> currLocVal > DISTANCE_TOLLERANCE (" + String(distance) + ")", 1);
         delay(2000);
+        GNSS_DISPLACEMENT_ALARM = true;
         return true;
     }
+    GNSS_DISPLACEMENT_ALARM = false;
     return false;
 }
 

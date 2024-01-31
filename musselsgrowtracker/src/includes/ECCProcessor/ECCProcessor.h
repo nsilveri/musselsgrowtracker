@@ -1,23 +1,26 @@
-#ifndef ECC_PROCESSOR_H
-#define ECC_PROCESSOR_H
+#ifndef MYECC_H
+#define MYECC_H
 
+//#include "nanoEccLib\ecc.h"
 #include <Arduino.h>
-#include <tinyECC.h>
-//#include <uECC.h>
+#include <cstddef>
+#include <cstdint> 
+//#include "nanoEccLib\libs\ecdsa.h" 
+//#include "sha256.h"
+//#include <AESLib.h>
 
-class ECCProcessor {
+class MyECC {
 public:
-    ECCProcessor();
-    void encryption();//const String& message);
-    String plainText(const String& message);
-    String generateSignature(const String& message);
-    bool verifySignature(const String& message, const String& signature);
 
-private:
-    tinyECC ecc;
+    static String generateSHA256Hash(String data);
+    int signature_func();
+    
+    //static void printSHA256Hash(const uint8_t *hash);
+    static int my_rng_function(uint8_t *dest, unsigned size);
+    void printHex(const uint8_t* data, size_t length);
 
 };
 
-extern ECCProcessor eccProcessor;
+extern MyECC eccProcessor;
 
 #endif // ECC_PROCESSOR_H

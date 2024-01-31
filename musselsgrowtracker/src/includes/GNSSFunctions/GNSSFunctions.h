@@ -33,6 +33,7 @@ struct LocationEEPROMData {
 class GNSSHandler {
 public:
     //void    initializeGNSSPins();
+    bool    getDisplacementStatus();
     void    restoreOldLoc();
     void    initializeArduinoGNSSPins();
     void    initializeStmGNSSPins();
@@ -60,11 +61,13 @@ public:
     double  getInvalidLon();
     uint8_t setFixQuality(uint8_t QUALITY_TYPE);
     uint8_t setFixLocType(uint8_t FIX_TYPE);
-    void saveOnEeprom(double lat = 0, double lon = 0);
-    void restoreFromEeprom(double* lat, double* lon);
+    void    saveOnEeprom(double lat = 0, double lon = 0);
+    void    restoreFromEeprom(double* lat, double* lon);
+    byte*      generateLoRaMsg();
 
 private:
     bool tracking;
+    void intToByteArray(int val, byte* byteArray);
     //timerManager gnssTimer;
     //GNSSLocation currentLocation;
     //GNSSSatellites GNSSSat;

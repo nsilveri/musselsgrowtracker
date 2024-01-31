@@ -7,8 +7,15 @@
 #include "..\utilities\utilities.h"
 #include "..\LoRa\LoRaWANLib.h"
 #include "..\GY521\GY521Sensor.h"
+//#include "..\ECCProcessor\ECCProcessor.h"
 #include "..\ECCProcessor\ECCProcessor.h"
+#include "..\batteryManager\batteryMan.h"
+//#include "..\ECCProcessor\nanoEccLib\libs\bignum256.h"
+//#include "..\ECCProcessor\nanoEccLib\types.h"
 //#include "..\ECCProcessor\CryptoUtils.h"
+#include "..\ECCProcessor\sha256.h"
+
+#include <cstring>
 
 #define csPin 25
 
@@ -26,15 +33,29 @@ bool GNSS_RESUME_SUSPEND = false;
 bool enableRoutine = true;
 
 uint32_t UID[3] = {0, 0, 0};
-byte SysStatusByte = 156;
-byte* dataMsg = nullptr;;
+byte SysStatusByte;
+byte* dataMsg = nullptr;
 String msgToSendStr;
 String msgToSendHex;
 
-const char* message = "Messaggio segreto";
-size_t messageLength = strlen(message);
-uint8_t encryptedMessage[128]; // Assicurati che sia abbastanza grande
-size_t encryptedLength = sizeof(encryptedMessage);
+//const char* message = "Messaggio segreto";
+//size_t messageLength = strlen(message);
+//uint8_t encryptedMessage[128]; // Assicurati che sia abbastanza grande
+//size_t encryptedLength = sizeof(encryptedMessage);
+
+//BigNum256 privateKey;
+//PointAffine publicKey;
+
+const char* message;
+size_t messageLen = strlen(message);
+
+String hashMsg;//[SHA256_HASH_LENGTH];
+
+// Prepara le variabili per la firma
+//BigNum256 r, s;
+//EccPoint publicKey;
+//uint8_t privateKey[NUM_ECC_DIGITS];
+//PointAffine affinePublicKey;
 
 void handleSerialCommand(char command) {
   switch (command) {
@@ -63,49 +84,20 @@ void handleSerialCommand(char command) {
     //  break;
     
     case 'y':
-      if(EncryptionMode)
-      {
-        log("ECC Encryption selected", 1);
-        delay(2000);
-        dataMsg = MSGPayload.createDataMsg(getIDDevice.get_UID(), RTC.getEpoch(), loadCell.get_LastWeightReading(), SysStatusByte);
-        msgToSendHex = MSGPayload.bytesToHexString(dataMsg, MSGPayload.get_MsgSize());
-        log("dataMsg HEX: " + msgToSendHex, 1);
-
-        String PText = eccProcessor.plainText(msgToSendHex);
-        log("Plaintext: " + PText, 1);
-        
-        String signature = eccProcessor.generateSignature(msgToSendHex);
-        
-        eccProcessor.encryption();
-
-        bool isSignatureValid = eccProcessor.verifySignature(msgToSendHex, signature);
-
-        String additionalInfo;
-        if (isSignatureValid) {
-            additionalInfo = " | Valid!"; // La stringa da aggiungere se la condizione è vera
-        } else {
-            additionalInfo = " | Not valid!"; // La stringa da aggiungere se la condizione è falsa
-        }
-
-        log("Signature ECC: " + signature + additionalInfo, 1);
-        delete[] dataMsg;
-
-      }else if(!EncryptionMode)
-      {
-        log("Ethereum-RPL encryption selected", 1);
-        delay(2000);
-        dataMsg = MSGPayload.createDataMsg(getIDDevice.get_UID(), RTC.getEpoch(), loadCell.get_LastWeightReading(), SysStatusByte);
-        ethTx.CreateRawTransaction(dataMsg, MSGPayload.get_MsgSize());
-        delete[] dataMsg;
-      }
+      //eccProcessor.signMessageFunc();
+      msgService.sendMsg();
+    
     break;
 
+
     case 'q':
-      dataMsg = MSGPayload.createDataMsg(getIDDevice.get_UID(), RTC.getEpoch(), loadCell.get_LastWeightReading(), SysStatusByte);
+      dataMsg = MSGPayload.createDataMsg(getIDDevice.get_UID(), RTC.getEpoch(), gnssHandler.generateLoRaMsg(), loadCell.get_LastWeightReading(), bytePack.packData());
       msgToSendStr = MSGPayload.bytesToString(dataMsg, MSGPayload.get_MsgSize());
       msgToSendHex = MSGPayload.bytesToHexString(dataMsg, MSGPayload.get_MsgSize());
+      hashMsg = eccProcessor.generateSHA256Hash(msgToSendHex);
       delete[] dataMsg;
-      log("msgToSend:  \n\t[ASCII]: " + String(msgToSendStr) + "\n\t[HEX]: " + String(msgToSendHex), 1);
+      log("msgToSend:  \n\t[HEX]: " + String(msgToSendHex) + "\n\t[HASH]: " + String(hashMsg), 1);
+      eccProcessor.signature_func();
     break;
 
     case 'S':
@@ -113,7 +105,11 @@ void handleSerialCommand(char command) {
     break;
     
     case 's':
-      LoRaWANManager.sendMessage(999, 946686173, 100, 1);
+      dataMsg = MSGPayload.createDataMsg(getIDDevice.get_UID(), RTC.getEpoch(), gnssHandler.generateLoRaMsg(), loadCell.get_LastWeightReading(), bytePack.packData());
+      msgToSendHex = MSGPayload.bytesToHexString(dataMsg, MSGPayload.get_MsgSize());
+      log("msgT", 1);
+      LoRaWANManager.sendMessage(dataMsg, sizeof(dataMsg));
+      delete[] dataMsg;
       /*
         log("Received manual command!", 1);
         log("COMMAND: " + String(command), 2);
@@ -221,7 +217,8 @@ void handleSerialCommand(char command) {
       break;
 
     case 'b':
-      pwrMan.getVBAT();
+      pwrMan.get_BatPercent();
+      //bytePackaging
       break;
 
     case 'z':
@@ -246,7 +243,7 @@ void handleSerialCommand(char command) {
       break;
 
     case 'v':
-      pwrMan.getVDDA();
+      pwrMan.get_VDDA();
       break;
     /*
     case 'k':

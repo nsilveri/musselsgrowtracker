@@ -10,7 +10,7 @@ public:
     LoRaWANLib(const char *appEui, const char *appKey, const char *devEui);
     void begin();
     void getInfo();
-    void sendMessage(int serialID, unsigned long timestamp, long hx711Value, byte systemState);
+    void sendMessage(const byte* payload, size_t payloadSize);
 
 private:
     const char *_appEui;

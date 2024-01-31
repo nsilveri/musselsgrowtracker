@@ -6,6 +6,9 @@
 #include "..\Ethereum-RPL\ETrans.h"
 #include <string>
 #include "..\ECCProcessor\ECCProcessor.h"
+#include "..\GNSSFunctions\GNSSFunctions.h"
+#include "..\loadCell\loadCell.h"
+//#include "..\ECCProcessor\ECCtest.h"
 
 bool DEBUG_MODE;
 uint8_t LOG_LEVEL;
@@ -13,30 +16,29 @@ bool LOG_END_LOOP = false;
 String LOG_END_LINE_STRING = "END_LINE";
 String LOG_WAIT_STRING = "wait";
 
-float batt = 0.00;
-uint8_t batteryPercentage = 0;
-
 #define intLedPin 10
 bool LED_STATE = false;
 
-byte bytePackaging::packData(byte otherData) {
+byte bytePackaging::packData() {
     byte compressedBatteryLevel;
-    if (batteryPercentage >= 75) {
-        compressedBatteryLevel = 3; // 75%
-    } else if (batteryPercentage >= 50) {
-        compressedBatteryLevel = 2; // 50%
-    } else if (batteryPercentage >= 25) {
-        compressedBatteryLevel = 1; // 25%
+    if (pwrMan.get_BatPercent() <= 10) {
+        compressedBatteryLevel = 0; // 00
+    } else if (pwrMan.get_BatPercent() <= 25) {
+        compressedBatteryLevel = 1; // 01
+    } else if (pwrMan.get_BatPercent() <= 50) {
+        compressedBatteryLevel = 2; // 10
     } else {
-        compressedBatteryLevel = 0; // 10% o meno
+        compressedBatteryLevel = 3; // 11
     }
 
-    // Assicurati che otherData occupi solo 6 bit
-    otherData &= 0x3F; // 0x3F è 00111111 in binario
+    // Assicurati che gpsMovementDetected sia solo 0 o 1
+    byte gpsMovementBit = gnssHandler.getDisplacementStatus() ? 1 : 0;
 
-    // Combina i dati
-    return (compressedBatteryLevel << 6) | otherData;
+    // Il bit di spostamento GPS viene inserito nel bit 6
+    // e i livelli della batteria compressi nei bit 7 e 8.
+    return (compressedBatteryLevel << 6) | (gpsMovementBit << 5);
 }
+
 
 
 byte* UID::get_UID() {
@@ -177,23 +179,6 @@ void STM32L0_Voltage::(void(*callback)(void))
     _locationCallback = Callback(callback);
 }
 */
-
-float powerManagement::getVDDA()
-{
-  float VDDA = STM32L0.getVDDA();
-  log("VDDA= " + String(VDDA), 1);
-  return VDDA;
-}
-
-float powerManagement::getVBAT()
-{
-  batt = STM32L0.getVBAT();
-  batteryPercentage = map(batt, 3.2, 4.2, 0, 100);
-  if(batt > 3) {
-    log("Bat= " + String(batt) + " " + String(batteryPercentage) + "%", 1);
-  }else log("Bat= No battery detected!", 1);
-  return batt;
-}
 
 float getTemp()
 {
@@ -357,13 +342,14 @@ void ethTransaction::CreateRawTransaction(byte *byteArray, size_t arraySize) {
     EthTr.assembleTx(charArray);
 }      
 
-byte* LoRaPayload::createDataMsg(const byte* SerialID, uint32_t TimestampLinux, uint16_t LoadCellMeasurement, byte SysStatus) {
-    const uint8_t SERIALID_SIZE = 6;
-    const uint8_t TIMESTAMP_SIZE = 4;
-    const uint8_t LOADCELL_SIZE = 2;
-    const uint8_t SYSSTATUS_SIZE = 1;
+byte* LoRaPayload::createDataMsg(const byte* SerialID, uint32_t TimestampLinux, byte* GpsData, uint16_t LoadCellMeasurement, byte SysStatus) {
+    const uint8_t SERIALID_SIZE =   6; // UID  data size
+    const uint8_t TIMESTAMP_SIZE =  4; // TS   data size
+    const uint8_t GNSS_LOCATION =   8; // GNSS data size
+    const uint8_t LOADCELL_SIZE =   2; // LC   data size
+    const uint8_t SYSSTATUS_SIZE =  1; // SYS  data size
 
-    size_t bufferSize = SERIALID_SIZE + TIMESTAMP_SIZE + LOADCELL_SIZE + SYSSTATUS_SIZE;
+    size_t bufferSize = SERIALID_SIZE + TIMESTAMP_SIZE + GNSS_LOCATION + LOADCELL_SIZE + SYSSTATUS_SIZE;
     byte* buffer = new byte[bufferSize];
     int pos = 0;
 
@@ -376,6 +362,12 @@ byte* LoRaPayload::createDataMsg(const byte* SerialID, uint32_t TimestampLinux, 
     // Log TimestampLinux
     logBytes(buffer + pos, TIMESTAMP_SIZE, "TimeStamp: ");
     pos += TIMESTAMP_SIZE;
+
+    // Aggiungi dati GPS al buffer
+    memcpy(buffer + pos, GpsData, GNSS_LOCATION);
+    // Log GPS Data
+    logBytes(buffer + pos, GNSS_LOCATION, "GPS Data: ");
+    pos += GNSS_LOCATION;
     
     memcpy(buffer + pos, &LoadCellMeasurement, LOADCELL_SIZE);
     // Log LoadCellMeasurement
@@ -386,10 +378,57 @@ byte* LoRaPayload::createDataMsg(const byte* SerialID, uint32_t TimestampLinux, 
     // Log SysStatus
     logBytes(buffer + pos, SYSSTATUS_SIZE, "SysStatus: ");
 
+    set_msgByte(buffer, bufferSize);
+
     dataMsg = buffer;
     dataMsgSize = bufferSize;
 
     return buffer;
+}
+
+void LoRaPayload::clearData() {
+    msgToSendStr = "";
+    msgToSendHex = "";
+
+    if (dataMsg != nullptr) {
+        delete[] dataMsg;
+        dataMsg = nullptr;
+        dataMsgSize = 0;
+    }
+}
+
+void LoRaPayload::set_msgByte(byte* msg, size_t msgSize) {
+    if (msg == nullptr || msgSize == 0) {
+        clearData();
+        return;
+    }
+
+    clearData();
+
+    dataMsg = new byte[msgSize];
+    memcpy(dataMsg, msg, msgSize);
+    dataMsgSize = msgSize;
+
+    msgToSendStr = bytesToString(dataMsg, dataMsgSize);
+    msgToSendHex = bytesToHexString(dataMsg, dataMsgSize);
+}
+
+String LoRaPayload::get_msgStr() {
+    return msgToSendStr;
+}
+
+String LoRaPayload::get_msgHex() {
+    return msgToSendHex;
+}
+
+String LoRaPayload::set_msgStr(String msg) {
+    clearData();
+    msgToSendStr = msg;
+}
+
+String LoRaPayload::set_msgHex(String msg) {
+    clearData();
+    msgToSendHex = msg;
 }
 
 void LoRaPayload::logBytes(const byte* data, size_t size, const char* message) {
@@ -474,28 +513,48 @@ double GNSSEeprom::EEPROMRead(int address) {
     return value;
 }
 
-/*
-void GNSSEeprom::EEPROMWrite(int address, double value) {
-
-    int convertedValueInt = static_cast<int>(value * 10000000);
-    EEPROM.writeInt(address, convertedValueInt);
-    //}
-}
-
-double GNSSEeprom::EEPROMRead(int address) {
-    int convertedValueInt = EEPROM.readInt(address++);
-    double value = static_cast<double>(convertedValueInt) / 10000000;
-    return value;
-}
-
-void GNSSEeprom::formatEEPROM() {
-    for (int i = 0; i < EEPROM.length(); i++) {
-        EEPROM.updateDouble(i, 0xFF); // Imposta ogni cella a 0xFF
+void MSGSend::sendMsg() {
+    if(SEND_MODE == ECC_MODE) {
+        log("Sending data with ECC\n", 1);
+        sendMsgECC();
+    }else if(SEND_MODE == ETH_MODE) {
+        log("Sending data with ETH\n", 1);
+        sendMsgETH();
     }
 }
-*/
 
-//timerManager timerMan;
+void MSGSend::set_EccSign() {
+    SEND_MODE = ECC_MODE;
+}
+
+void MSGSend::set_EthSign() {
+    SEND_MODE = ETH_MODE;
+}
+
+void MSGSend::sendMsgECC() 
+{
+    log("ECC Encryption selected", 1);
+    delay(2000);                                                              //generateLoRaMsg()
+    MSGPayload.createDataMsg(getIDDevice.get_UID(), RTC.getEpoch(), gnssHandler.generateLoRaMsg(), loadCell.get_LastWeightReading(), bytePack.packData());
+    //msgToSendHex = MSGPayload.get_msgHex();
+    log("\ndataMsg HEX: " + MSGPayload.get_msgHex(), 1);
+
+    String hashMsg = MyECC::generateSHA256Hash(MSGPayload.get_msgHex());
+    log("dataMsg Hash (HEX): " + String(hashMsg), 1);
+    log("dataMsg Size (HEX): " + String(hashMsg), 1);
+
+    LoRaWANManager.sendMessage(MSGPayload.get_DataMsg(), MSGPayload.get_MsgSize());
+}
+    
+void MSGSend::sendMsgETH() 
+{
+    log("Ethereum-RPL encryption selected", 1);
+    delay(2000);
+    MSGPayload.createDataMsg(getIDDevice.get_UID(), RTC.getEpoch(), gnssHandler.generateLoRaMsg(), loadCell.get_LastWeightReading(), bytePack.packData());
+    ethTx.CreateRawTransaction(MSGPayload.get_DataMsg(), MSGPayload.get_MsgSize());
+    //MSGPayload.clearData();
+}
+
 UID getIDDevice;
 LoRaPayload MSGPayload;
 ethTransaction ethTx;
@@ -503,4 +562,5 @@ mosSwitch mosfetSwitch;
 intLED intBlueLED;
 WireScan i2cScan;
 GNSSEeprom gnssEeprom;
-powerManagement pwrMan;
+bytePackaging bytePack;
+MSGSend msgService;
