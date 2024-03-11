@@ -104,7 +104,7 @@ void GNSSHandler::initializeStmGNSSPins() {
 }
 
 
-void GNSSHandler::configureGNSS() {
+void GNSSHandler::configureGNSS(bool EXT_ANT = false) {
 
     GNSS.begin(Serial1, GNSS.MODE_UBLOX, GNSS.RATE_10HZ);
     toggleGNSS(true); //turn on GNSS
@@ -115,7 +115,10 @@ void GNSSHandler::configureGNSS() {
     GNSS.setPlatform(GNSS.PLATFORM_SEA);
     while (GNSS.busy()) { }
 
-    GNSS.setAntenna(GNSS.ANTENNA_EXTERNAL);
+    if(EXT_ANT) {
+        GNSS.setAntenna(GNSS.ANTENNA_EXTERNAL);
+    }else GNSS.setAntenna(GNSS.ANTENNA_INTERNAL);
+    
     while (GNSS.busy()) { }
 }
 

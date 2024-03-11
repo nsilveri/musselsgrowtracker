@@ -29,6 +29,14 @@
 #include "GNSS.h"
 #include "wiring_private.h"
 
+#define GNSS_ENABLE  (5u)
+#define GNSS_PPS     (4u)
+#define GNSS_BACKUP  A0
+
+#define STM32L0_CONFIG_PIN_GNSS_PPS GNSS_PPS
+#define STM32L0_CONFIG_PIN_GNSS_BACKUP GNSS_BACKUP
+#define STM32L0_CONFIG_PIN_GNSS_ENABLE GNSS_ENABLE
+
 GNSSLocation::GNSSLocation(const gnss_location_t *location)
 {
     _location = *location;
@@ -541,16 +549,19 @@ bool GNSSClass::suspend()
 
 bool GNSSClass::resume()
 {
+    uint16_t stm32_enable_pin = g_APinDescription[GNSS_ENABLE].pin;
+    uint16_t stm32_pps_pin    = g_APinDescription[GNSS_PPS].pin;
+    uint16_t stm32_backup_pin = g_APinDescription[GNSS_BACKUP].pin;
     if (!(_uart && gnss_resume()))
     {
         return false;
     }
 
-#if defined(STM32L0_CONFIG_PIN_GNSS_PPS)
+//#if defined(STM32L0_CONFIG_PIN_GNSS_PPS)
     //Serial.println("STM32L0_GPIO_PIN_PB7 DEFINED RESUME==========================================================");
     stm32l0_gpio_pin_configure(STM32L0_CONFIG_PIN_GNSS_PPS, (STM32L0_GPIO_PARK_NONE | STM32L0_GPIO_PUPD_PULLDOWN | STM32L0_GPIO_OSPEED_HIGH | STM32L0_GPIO_OTYPE_PUSHPULL | STM32L0_GPIO_MODE_INPUT));
     stm32l0_exti_attach(STM32L0_CONFIG_PIN_GNSS_PPS, STM32L0_EXTI_CONTROL_EDGE_FALLING, (stm32l0_exti_callback_t)ppsCallback, (void*)this);
-#endif
+//#endif
     
     return true;
 }

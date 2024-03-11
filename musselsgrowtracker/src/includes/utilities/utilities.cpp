@@ -3,12 +3,12 @@
 #include "utilities.h"
 #include <STM32L0.h>
 #include <Wire.h>
-#include "..\Ethereum-RPL\ETrans.h"
+
 #include <string>
 #include "..\ECCProcessor\ECCProcessor.h"
 #include "..\GNSSFunctions\GNSSFunctions.h"
 #include "..\loadCell\loadCell.h"
-//#include "..\ECCProcessor\ECCtest.h"
+#include "..\ECCProcessor\sha256.h"
 
 bool DEBUG_MODE;
 uint8_t LOG_LEVEL;
@@ -30,12 +30,8 @@ byte bytePackaging::packData() {
     } else {
         compressedBatteryLevel = 3; // 11
     }
-
-    // Assicurati che gpsMovementDetected sia solo 0 o 1
     byte gpsMovementBit = gnssHandler.getDisplacementStatus() ? 1 : 0;
 
-    // Il bit di spostamento GPS viene inserito nel bit 6
-    // e i livelli della batteria compressi nei bit 7 e 8.
     return (compressedBatteryLevel << 6) | (gpsMovementBit << 5);
 }
 
@@ -76,7 +72,7 @@ String UID::get_UID_String() {
 
     // Combinare le due rappresentazioni in una stringa
     String combinedString = "UID: \n\tHEX: " + uidHex + "\n\tASCII: " + uidAscii;
-    return combinedString; // Restituire la stringa combinata
+    return combinedString;
 }
 
 
@@ -167,18 +163,16 @@ void deep_sleep(uint32_t seconds)
     unsigned long startTime;
     startTime = millis();
 
+    //STM32L0.enablePowerSave();
     STM32L0.stop(seconds * 1000);
-
+    //STM32L0.
+    //HAL_PWREx_EnterSHUTDOWNMode();
+    //STM32L0.deepsleep(seconds * 1000);
+    //STM32L0.stop(seconds * 1000);
     unsigned long stopTime = millis();
     unsigned long elapsedTime = stopTime - startTime;
     log("deep_sleep for " + String(elapsedTime/1000) + " seconds.", 1);
 }
-/*
-void STM32L0_Voltage::(void(*callback)(void))
-{
-    _locationCallback = Callback(callback);
-}
-*/
 
 float getTemp()
 {
@@ -212,12 +206,9 @@ void intLED::intLED_on_off()
 
 void intLED::intLED_off()
 {
-  if(LED_STATE != false)
-  {
     LED_STATE = false;
     digitalWrite(intLedPin, LED_STATE);
     log("intLED OFF", 2);
-  }
 }
 
 void intLED::visualLog()
@@ -254,7 +245,6 @@ void WireScan::i2cScan() {
 
   Serial.println("Scanning...");
 
-  // Crea una mappa di indirizzi e nomi associati
   struct I2CDevice {
     byte address;
     const char* name;
@@ -266,7 +256,6 @@ void WireScan::i2cScan() {
     {0x60, "Internal device"},
     {0x68, "GY521 (accelerometer)"},
     {0x77, "Internal device"}
-    // Aggiungi altri dispositivi qui con i loro indirizzi e nomi
   };
 
   nDevices = 0;
@@ -305,7 +294,15 @@ void mosSwitch::begin()
 
 bool mosSwitch::mosfet_state_change(bool STATE)
 {
-    digitalWrite(MOSFET_PIN, STATE);
+    if(STATE) {
+      pinMode(MOSFET_PIN, OUTPUT);
+      digitalWrite(MOSFET_PIN, STATE);
+    }else if(!STATE) {
+      digitalWrite(MOSFET_PIN, STATE);
+      pinMode(MOSFET_PIN, INPUT);
+    }
+    
+    //analogWrite(MOSFET_PIN, )
     return MOSFET_STATE;
 }
 
@@ -337,230 +334,31 @@ bool mosSwitch::turn_on()
     }
 }
 
-void ethTransaction::CreateRawTransaction(byte *byteArray, size_t arraySize) {
-    const char *charArray = reinterpret_cast<const char*>(byteArray);
-    EthTr.assembleTx(charArray);
-}      
-
-byte* LoRaPayload::createDataMsg(const byte* SerialID, uint32_t TimestampLinux, byte* GpsData, uint16_t LoadCellMeasurement, byte SysStatus) {
-    const uint8_t SERIALID_SIZE =   6; // UID  data size
-    const uint8_t TIMESTAMP_SIZE =  4; // TS   data size
-    const uint8_t GNSS_LOCATION =   8; // GNSS data size
-    const uint8_t LOADCELL_SIZE =   2; // LC   data size
-    const uint8_t SYSSTATUS_SIZE =  1; // SYS  data size
-
-    size_t bufferSize = SERIALID_SIZE + TIMESTAMP_SIZE + GNSS_LOCATION + LOADCELL_SIZE + SYSSTATUS_SIZE;
-    byte* buffer = new byte[bufferSize];
-    int pos = 0;
-
-    memcpy(buffer + pos, SerialID, SERIALID_SIZE);
-    // Log SerialID
-    logBytes(buffer + pos, SERIALID_SIZE, "SerialID: ");
-    pos += SERIALID_SIZE;
-    
-    memcpy(buffer + pos, &TimestampLinux, TIMESTAMP_SIZE);
-    // Log TimestampLinux
-    logBytes(buffer + pos, TIMESTAMP_SIZE, "TimeStamp: ");
-    pos += TIMESTAMP_SIZE;
-
-    // Aggiungi dati GPS al buffer
-    memcpy(buffer + pos, GpsData, GNSS_LOCATION);
-    // Log GPS Data
-    logBytes(buffer + pos, GNSS_LOCATION, "GPS Data: ");
-    pos += GNSS_LOCATION;
-    
-    memcpy(buffer + pos, &LoadCellMeasurement, LOADCELL_SIZE);
-    // Log LoadCellMeasurement
-    logBytes(buffer + pos, LOADCELL_SIZE, "LoadCell: ");
-    pos += LOADCELL_SIZE;
-
-    buffer[pos] = SysStatus;
-    // Log SysStatus
-    logBytes(buffer + pos, SYSSTATUS_SIZE, "SysStatus: ");
-
-    set_msgByte(buffer, bufferSize);
-
-    dataMsg = buffer;
-    dataMsgSize = bufferSize;
-
-    return buffer;
-}
-
-void LoRaPayload::clearData() {
-    msgToSendStr = "";
-    msgToSendHex = "";
-
-    if (dataMsg != nullptr) {
-        delete[] dataMsg;
-        dataMsg = nullptr;
-        dataMsgSize = 0;
-    }
-}
-
-void LoRaPayload::set_msgByte(byte* msg, size_t msgSize) {
-    if (msg == nullptr || msgSize == 0) {
-        clearData();
-        return;
-    }
-
-    clearData();
-
-    dataMsg = new byte[msgSize];
-    memcpy(dataMsg, msg, msgSize);
-    dataMsgSize = msgSize;
-
-    msgToSendStr = bytesToString(dataMsg, dataMsgSize);
-    msgToSendHex = bytesToHexString(dataMsg, dataMsgSize);
-}
-
-String LoRaPayload::get_msgStr() {
-    return msgToSendStr;
-}
-
-String LoRaPayload::get_msgHex() {
-    return msgToSendHex;
-}
-
-String LoRaPayload::set_msgStr(String msg) {
-    clearData();
-    msgToSendStr = msg;
-}
-
-String LoRaPayload::set_msgHex(String msg) {
-    clearData();
-    msgToSendHex = msg;
-}
-
-void LoRaPayload::logBytes(const byte* data, size_t size, const char* message) {
-    String output = message;
-    output += " [ASCII]: ";
-    for (size_t i = 0; i < size; ++i) {
-        // Aggiunge il carattere ASCII o un punto se non è stampabile
-        output += isPrintable(data[i]) ? (char)data[i] : '.';
-    }
-    output += " [HEX]: ";
-    for (size_t i = 0; i < size; ++i) {
-        // Aggiunge la rappresentazione esadecimale
-        char buf[3];
-        sprintf(buf, "%02X", data[i]);
-        output += buf;
-        if (i < size - 1) output += " ";
-    }
-    log(output, 1);
-}
-
-
-size_t LoRaPayload::get_MsgSize(){
-  return dataMsgSize;
-}
-
-String LoRaPayload::bytesToHexString(const byte* buffer, size_t bufferSize) {
-    String hexString = "";
-    for (unsigned int i = 0; i < bufferSize; i++) {
-        if (buffer[i] < 16) {
-            hexString += "0";  // Aggiunge uno zero davanti se il numero è minore di 16 (es. 0A invece di A)
-        }
-        hexString += String(buffer[i], HEX); // Converte il byte in esadecimale e lo aggiunge alla stringa
-    }
-    hexString.toUpperCase(); // Opzionale: converte la stringa in caratteri maiuscoli
-    return hexString;
-}
-
-
-
-byte* LoRaPayload::get_DataMsg() const {
-    return dataMsg;
-}
-
-String LoRaPayload::bytesToString(const byte* buffer, size_t bufferSize) {
-    String result = "";
-    
-    for (size_t i = 0; i < bufferSize; ++i) {
-        result += (char)buffer[i];  // Converti il byte in un carattere
-        result += ' ';              // Aggiungi uno spazio dopo il carattere
-    }
-
-    return result; // Rimuove lo spazio finale
-}
-
 void GNSSEeprom::saveGNSSCoordinates(double lat, double lon) {
-    EEPROMWrite(latAddress, lat); // Salva la latitudine all'indirizzo 0
-    EEPROMWrite(lonAddress, lon); // Salva la longitudine all'indirizzo successivo
+    EEPROMWrite(latAddress, lat);
+    EEPROMWrite(lonAddress, lon);
 }
 
 double GNSSEeprom::readLatitude() {
-    return EEPROMRead(latAddress); // Legge la latitudine dall'indirizzo 0
+    return EEPROMRead(latAddress);
 }
 
 double GNSSEeprom::readLongitude() {
-    return EEPROMRead(lonAddress); // Legge la longitudine dall'indirizzo successivo
+    return EEPROMRead(lonAddress);
 }
 
 void GNSSEeprom::EEPROMWrite(int address, double value) {
-    //byte* p = (byte*)(void*)&value;
-    //for (int i = 0; i < sizeof(value); i++) {
     EEPROM.updateDouble(address, value);
-    //}
 }
 
 double GNSSEeprom::EEPROMRead(int address) {
-    double value = EEPROM.readDouble(address++); //0.0;
-    //byte* p = (byte*)(void*)&value;
-    //for (int i = 0; i < sizeof(value); i++) {
-    //    //*p++ = EEPROM.read(address++);
-    //    *p++ = EEPROM.readDouble(address++);
-    //}
+    double value = EEPROM.readDouble(address++);
     return value;
 }
 
-void MSGSend::sendMsg() {
-    if(SEND_MODE == ECC_MODE) {
-        log("Sending data with ECC\n", 1);
-        sendMsgECC();
-    }else if(SEND_MODE == ETH_MODE) {
-        log("Sending data with ETH\n", 1);
-        sendMsgETH();
-    }
-}
-
-void MSGSend::set_EccSign() {
-    SEND_MODE = ECC_MODE;
-}
-
-void MSGSend::set_EthSign() {
-    SEND_MODE = ETH_MODE;
-}
-
-void MSGSend::sendMsgECC() 
-{
-    log("ECC Encryption selected", 1);
-    delay(2000);                                                              //generateLoRaMsg()
-    MSGPayload.createDataMsg(getIDDevice.get_UID(), RTC.getEpoch(), gnssHandler.generateLoRaMsg(), loadCell.get_LastWeightReading(), bytePack.packData());
-    //msgToSendHex = MSGPayload.get_msgHex();
-    log("\ndataMsg HEX: " + MSGPayload.get_msgHex(), 1);
-
-    String hashMsg = MyECC::generateSHA256Hash(MSGPayload.get_msgHex());
-    log("dataMsg Hash (HEX): " + String(hashMsg), 1);
-    log("dataMsg Size (HEX): " + String(hashMsg), 1);
-
-    LoRaWANManager.sendMessage(MSGPayload.get_DataMsg(), MSGPayload.get_MsgSize());
-}
-    
-void MSGSend::sendMsgETH() 
-{
-    log("Ethereum-RPL encryption selected", 1);
-    delay(2000);
-    MSGPayload.createDataMsg(getIDDevice.get_UID(), RTC.getEpoch(), gnssHandler.generateLoRaMsg(), loadCell.get_LastWeightReading(), bytePack.packData());
-    ethTx.CreateRawTransaction(MSGPayload.get_DataMsg(), MSGPayload.get_MsgSize());
-    //MSGPayload.clearData();
-}
-
 UID getIDDevice;
-LoRaPayload MSGPayload;
-ethTransaction ethTx;
 mosSwitch mosfetSwitch;
 intLED intBlueLED;
 WireScan i2cScan;
 GNSSEeprom gnssEeprom;
 bytePackaging bytePack;
-MSGSend msgService;

@@ -12,8 +12,8 @@ void ADS1115Sensor::begin() {
 int16_t ADS1115Sensor::readAverageRaw(int numReadings) {
     long sum = 0;
     for (int i = 0; i < numReadings; i++) {
-        sum += readRaw();  // Assumendo che readRaw() sia la tua funzione per leggere il valore grezzo
-        delay(10);  // Piccola pausa tra le letture per stabilità
+        sum += readRaw();
+        delay(10);
     }
     return (int16_t)(sum / numReadings);
 }

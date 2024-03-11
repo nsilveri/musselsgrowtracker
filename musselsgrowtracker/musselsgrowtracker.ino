@@ -1,14 +1,13 @@
 #include <STM32L0.h>
 #include <Arduino.h>
-#include "src\includes\utilities\utilities.h"
 #include "src\includes\GNSSFunctions\GNSSFunctions.h"
 #include "src\includes\handleSerial\handleSerialCommand.h"
 #include "src\includes\loadCell\loadCell.h"
 #include "src\includes\SPI\SPIFlash.h"
 #include "src\includes\LoRa\LoRaWANLib.h"
-#include "src\includes\GY521\GY521Sensor.h"
 #include <RTC.h>
 #include "src\includes\ECCProcessor\ECCProcessor.h"
+#include <Wire.h>
 
 #define SLEEP 0
 #define RTC_INT 1
@@ -17,8 +16,7 @@
 #define LORAW_SENDING 4
 #define TIMEOUT_EXE 99
 
-#define intPin1 3
-#define intPin2 2
+#define USER_BUTTON 2
 
 #define MOV_TOLERANCE 5
 
@@ -31,8 +29,9 @@
 //LoRaWANLib loraWAN(appEui, appKey, devEui);
 
 bool SerialDebug = true;
+bool deep_state = false;
 
-//SPIFlash intMemory(csPin);
+SPIFlash intMemory(csPin);
 
 unsigned long previousMillis = 0; 
 const long interval = 1000;
@@ -50,17 +49,10 @@ timerManager routineTimer;
 
 byte* uidBytes;
 
-//uint32_t UID[3] = {0, 0, 0};
-
-//MPU6050 accMeter;
-
-void setNextAlarmIn(const uint32_t &seconds) {
-  RTC.setAlarmEpoch(RTC.getEpoch() + seconds);
-}
-
 void setup() {
   Serial.begin(115200);
 
+  pinMode(2, INPUT);
   setDebugMode(DEBUG);
   setDebugLevel(LOG_LEV);
 
@@ -75,58 +67,25 @@ void setup() {
   intMemory.init();
   loadCell.begin();
   intBlueLED.begin();
-  accMeter.begin();
   
-  //BMA280Func.begin();
-  //bma280handler.begin();
-  //attachInterrupt(digitalPinToInterrupt(intPin1), []{ bma280handler.handleInterrupt1(); }, RISING);
-  //attachInterrupt(digitalPinToInterrupt(intPin2), []{ bma280handler.handleInterrupt2(); }, RISING);
-  //gnssHandler.initializeArduinoGNSSPins();
   gnssHandler.initializeStmGNSSPins();
-  gnssHandler.configureGNSS();
+  gnssHandler.configureGNSS(GNSS_ANTENNA_INTERNAL); //GNSS_ANTENNA_EXTERNAL
 
   LoRaWANManager.begin();
-  //eccProcessor.setupECC();
-
-  Step = 0;
-
-  //set alarm to update the RTC periodically
-  //setNextAlarmIn(SecondsBetweenActivations);
-  //RTC.enableAlarm(RTC.MATCH_YYMMDDHHMMSS);
-  //RTC.attachInterrupt(alarmMatch);
-
-  mosfetSwitch.turn_off();
 }
 
-void alarmMatch()
-{
-	if( SerialDebug )
-		log("\t\t\t\t\t{ ALARM! }", 1);
-	// RTC alarm occurred, time to wakeup for duty!
-	// Relaunch RTC for next wakeup and restart the job
-	Step = RTC_INT;
-	setNextAlarmIn(SecondsBetweenActivations);
-	STM32L0.wakeup();
-}
 
-void run()
-{
-  gnssHandler.updateRTCViaGNSS();
-  loadCell.read_weight(100);
-  intBlueLED.intLED_on_off();
-  getVDDA();
-  getTemp();
-  deep_sleep(10);
-}
 
 void GNSS_routine()
 {  
   bool GNSFix = gnssHandler.getIsLocationFixed();
   bool RTCFix = gnssHandler.RTCFix();
-  log("Eeprom locVal => lat:" + String(gnssEeprom.readLatitude()) + ", lon: " + String(gnssEeprom.readLongitude()),1);
-  log("getIsLocationFixed: " + String(GNSFix) + "\t RTCFix:" + String(RTCFix), 1);
+  log("Eeprom locVal => lat:" + String(gnssEeprom.readLatitude())
+     + ", lon: " + String(gnssEeprom.readLongitude()),1);
+  log("getIsLocationFixed: " + String(GNSFix)
+     + "\t RTCFix:" + String(RTCFix), 1);
   
-  if(!GNSFix || !RTCFix) //aggiungere lo step
+  if(!GNSFix || !RTCFix)
   {
     gnssHandler.toggleGNSS(true);
     bool GNSSModuleState = gnssHandler.getGNSSModuleState(); 
@@ -134,7 +93,6 @@ void GNSS_routine()
     if(GNSSModuleState) {
         log("RUN: GNSS update.", 2); 
         gnssHandler.update();  // Update GNSS data 
-        //gnssHandler.readGpsTime(); 
     }else log("RUN: GNSS OFF.", 1);
   }else if(GNSFix || RTCFix){
     log("GNS COMPLETED!", 1);
@@ -155,37 +113,39 @@ void LoadCell_routine()
 
 void SendMessage_routine()
 {
-  msgService.set_EccSign();
-  //msgService.set_EthSign();
-  msgService.sendMsg();
+  MSGPayload.sendMergedMsg();
   ROUTINE_STEP++;
 }
 
 
 void routine() {
+  if(deep_state){
+    deep_state = false;
+  }
+  if(digitalRead(USER_BUTTON)) {
+    ROUTINE_STEP = 3;
+  }
   if (!enableRoutine) {
-        return;  // if routine disable exits from function
+        return;
     }
-
   if(routineTimer.delay(1000)) {
-    log("ROUTINE:\n\tSTEP:" + String(ROUTINE_STEP) + "\n\tITERATION_NUMBER: " + String(ROUTINE_ITERATION_NUMBER), 1);
+    log("ROUTINE:\n\tSTEP:" + String(ROUTINE_STEP) + 
+    "\n\tITERATION_NUMBER: " + String(ROUTINE_ITERATION_NUMBER), 1);
 
     if(ROUTINE_STEP == 0) {
+      mosfetSwitch.turn_on();
       GNSS_routine();
-    }
-  
-    if(ROUTINE_STEP == 1) {
+    }else if(ROUTINE_STEP == 1) {
       LoadCell_routine();
-    }
-
-    if(ROUTINE_STEP == 2) {
+    }else if(ROUTINE_STEP == 2) {
       SendMessage_routine();
-    }
-
-    if(ROUTINE_STEP == 3) {
+    }else if(ROUTINE_STEP == 3) {
       log("Routine compleate\n\tDeep sleeping for 1 min...", 1);
       ROUTINE_STEP = 0;
       ROUTINE_ITERATION_NUMBER++;
+      mosfetSwitch.turn_off();
+      intBlueLED.intLED_off();
+      gnssHandler.toggleGNSS(false);
       deep_sleep(60);
     }
   }
@@ -201,26 +161,6 @@ void loop() {
   }
 
   routine();
-  
-  /*
-  switch (Step) {
-    case 0:
-      STM32L0.stop(10000); //stop per 1 ora
-      Serial.println("Case 0");
-      return;
-      break;
-
-    case 1:
-      gnssHandler.enable();  // Enable GNSS
-      break;
-  }
-  */
-  
-  /*
-  if (gnssHandler.isTracking()) {
-    gnssHandler.readPositioningData();
-  }
-  */
 
   if (Serial.available()) {
     char c = Serial.read();

@@ -2,9 +2,13 @@
 #include "..\utilities\utilities.h"
 #include <STM32L0.h>
 
+//#define ADS1115_ENABLED
+
+#ifdef ADS1115_ENABLED
 void powerManagement::begin() {
     ads.begin();
 }
+#endif
 
 float powerManagement::get_VDDA()
 {
@@ -15,6 +19,7 @@ float powerManagement::get_VDDA()
 
 uint8_t powerManagement::get_BatPercent()
 {
+
     uint8_t batt = get_VBAT();
     if(batt > 3) {
         log("Bat= " + String(batteryPercentage) + "%", 1);
@@ -25,24 +30,9 @@ uint8_t powerManagement::get_BatPercent()
     }
 }
 
-/*
-float powerManagement::get_int_VBAT() 
-{
-    int32_t vrefint_data, vbat_data;
-    float vdda;
-
-    vrefint_data = __analogReadInternal(STM32L0_ADC_CHANNEL_VREFINT, STM32L0_ADC_VREFINT_PERIOD);
-    vbat_data = __analogReadInternal(STM32L0_CONFIG_CHANNEL_VBAT, STM32L0_CONFIG_VBAT_PERIOD);
-
-    vdda = (3.0 * STM32L0_ADC_VREFINT_CAL) / vrefint_data;
-
-    return (STM32L0_CONFIG_VBAT_SCALE * vdda * vbat_data) / 4095.0;
-
-}
-*/
-
 float powerManagement::get_VBAT()
 {
+#ifdef ADS1115_ENABLED
     float battRead = STM32L0.getVBAT();
     log("internal read: " + String(battRead), 2);
     if(battRead > 3) {
@@ -57,6 +47,16 @@ float powerManagement::get_VBAT()
             return battRead;
         }
     }
+#endif
+
+#ifndef ADS1115_ENABLED
+    float battRead = STM32L0.getVBAT();
+        log("internal read: " + String(battRead), 2);
+        if(battRead > 3) {
+            batteryPercentage = map(battRead, 3.2, 4.2, 0, 100);
+            return battRead;
+        }
+#endif
 }
 
 powerManagement pwrMan;

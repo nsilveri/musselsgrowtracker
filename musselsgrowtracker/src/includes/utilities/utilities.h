@@ -8,7 +8,6 @@
 #include <EEPROMex.h>
 #include "..\batteryManager\batteryMan.h"
 #include "..\LoRa\LoRaWANLib.h"
-//#include <EEPROM.h>
 
 extern bool DEBUG_MODE;
 extern uint8_t LOG_LEVEL;
@@ -97,49 +96,13 @@ class mosSwitch
     bool mosfet_state_change(bool STATE);
 };
 
-class ethTransaction {
-  public:
-      void CreateRawTransaction(byte *byteArray, size_t arraySize); // Aggiungi la stringa data come parametro
-  private:
-//    EthTransaction ethTx; // Istanza della classe EthereumTransaction
-};
 
 class UID {
 public:
-    static const int UID_LENGTH = 12; // Definizione della lunghezza dell'UID
+    static const int UID_LENGTH = 12;
 
-    static byte* get_UID(); // Per ottenere l'UID come array di byte
-    static String get_UID_String(); // Per ottenere l'UID come stringa esadecimale
-};
-
-class LoRaPayload {
-  public:
-      byte* createDataMsg(const byte* SerialID, uint32_t TimestampLinux, byte* GpsData, uint16_t LoadCellMeasurement, byte SysStatus);
-      
-      String bytesToHexString(const byte* buffer, size_t bufferSize);
-      String bytesToString(const byte* buffer, size_t bufferSize);
-      
-      size_t get_MsgSize();
-      byte* get_DataMsg() const;
-      
-      String get_msgStr();
-      String get_msgHex();
-
-      void set_msgByte(byte* msg, size_t msgSize);
-
-      String set_msgStr(String msg);
-      String set_msgHex(String msg);
-
-      void logBytes(const byte* data, size_t size, const char* message);
-
-  private:
-      void clearData();
-
-      String msgToSendStr;
-      String msgToSendHex;
-
-      byte* dataMsg;
-      size_t dataMsgSize;
+    static byte* get_UID();
+    static String get_UID_String();
 };
 
 class GNSSEeprom {
@@ -157,30 +120,12 @@ class GNSSEeprom {
       uint8_t lonAddress = 10;
 };
 
-class MSGSend {
-  public:
-      void sendMsg();
-      void set_EccSign();
-      void set_EthSign();
-  private:
-      bool ECC_MODE = true;
-      bool ETH_MODE = false;
-      bool SEND_MODE = ECC_MODE;
-      
-      void sendMsgETH();
-      void sendMsgECC();
-};
-
 extern UID getIDDevice;
 extern intLED intBlueLED;
 extern WireScan i2cScan;
 extern mosSwitch mosfetSwitch;
 extern UID uidCode;
-extern ethTransaction ethTx;
-extern LoRaPayload MSGPayload;
 extern GNSSEeprom gnssEeprom;
 extern bytePackaging bytePack;
-extern MSGSend msgService;
-//extern timerManager timerMan;
 
 #endif // UTILITIES_H

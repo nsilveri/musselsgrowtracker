@@ -151,21 +151,22 @@ char *btoh(char *dest, uint8_t *src, int len) {
   return dest;
 }
 
-String SHA256(String data) 
+void SHA256(String data, uint8_t *hash_dest) 
 {
+  // Crea un buffer di dati dalla stringa di input
   uint8_t data_buffer[data.length()];
-  
-  for(int i=0; i<data.length(); i++)
+  for(int i = 0; i < data.length(); i++)
   {
     data_buffer[i] = (uint8_t)data.charAt(i);
   }
   
+  // Inizializza il contesto SHA256
   SHA256_CTX ctx;
-  ctx.datalen = 0;
-  ctx.bitlen = 512;
-  
   sha256_init(&ctx);
+  
+  // Aggiorna il contesto SHA256 con il tuo buffer di dati
   sha256_update(&ctx, data_buffer, data.length());
-  sha256_final(&ctx, hash);
-  return(btoh(hex, hash, 32));
+  
+  // Completa il calcolo SHA256 e memorizza il risultato in hash_dest
+  sha256_final(&ctx, hash_dest);
 }
